@@ -1,96 +1,124 @@
 'use client';
 
 import React from 'react'
-import { useAuth } from '../contexts/AuthContext'
-import { useData } from '../contexts/DataContext'
-import '../styles/dashboard.css'
+import { useAuth } from '../contexts/AuthContext.jsx'
+import { useData } from '../contexts/DataContext.jsx'
 
-function RegionalDashboard() {
+function RegionalDashboard({ onNavigate }) {
   const { user } = useAuth()
-  const { reports, ppns } = useData()
+  const { priceReports, ppnList } = useData()
+  
+  const myReports = priceReports.filter(r => r.region === user?.region)
+  const thisMonthReports = myReports.filter(r => {
+    const reportDate = new Date(r.date)
+    const now = new Date()
+    return reportDate.getMonth() === now.getMonth() && reportDate.getFullYear() === now.getFullYear()
+  })
 
-  const regionReports = reports.filter((r) => r.regionId === user.id)
-  const totalReports = regionReports.length
-  const ppnCount = ppns.length
-  const recentReports = regionReports.slice(-5).reverse()
+  const stats = [
+    { 
+      id: 'regional-reports',
+      label: 'Mes rapports', 
+      value: myReports.length, 
+      icon: '📋', 
+      color: '#2563eb',
+      bgColor: '#dbeafe'
+    },
+    { 
+      id: 'add-report',
+      label: 'Ce mois', 
+      value: thisMonthReports.length, 
+      icon: '📅', 
+      color: '#10b981',
+      bgColor: '#d1fae5'
+    },
+    { 
+      id: 'add-report',
+      label: 'Produits PPN', 
+      value: ppnList.length, 
+      icon: '📦', 
+      color: '#f59e0b',
+      bgColor: '#fef3c7'
+    },
+  ]
 
-  const getAveragePrices = () => {
-    if (regionReports.length === 0) return { min: 0, max: 0 }
-    const minPrices = regionReports.map((r) => r.minUnitPrice)
-    const maxPrices = regionReports.map((r) => r.maxUnitPrice)
-    const avgMin =
-      minPrices.reduce((a, b) => a + b, 0) / minPrices.length
-    const avgMax =
-      maxPrices.reduce((a, b) => a + b, 0) / maxPrices.length
-    return { min: avgMin.toFixed(0), max: avgMax.toFixed(0) }
-  }
-
-  const avgPrices = getAveragePrices()
+  const recentReports = [...myReports]
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 5)
 
   return (
-    <div className="dashboard-container">
+    <div className="animate-fade-in">
       <div className="dashboard-grid">
-        <div className="dashboard-card stat-card">
-          <h3>Rapports saisis</h3>
-          <p className="stat-number">{totalReports}</p>
-          <p className="stat-label">
-            {totalReports === 1 ? 'rapport' : 'rapports'}
-          </p>
-        </div>
-
-        <div className="dashboard-card stat-card">
-          <h3>PPN disponibles</h3>
-          <p className="stat-number">{ppnCount}</p>
-          <p className="stat-label">
-            {ppnCount === 1 ? 'produit' : 'produits'}
-          </p>
-        </div>
-
-        <div className="dashboard-card stat-card">
-          <h3>Prix moyen minimum</h3>
-          <p className="stat-number">{avgPrices.min}</p>
-          <p className="stat-label">derniers rapports</p>
-        </div>
-
-        <div className="dashboard-card stat-card">
-          <h3>Prix moyen maximum</h3>
-          <p className="stat-number">{avgPrices.max}</p>
-          <p className="stat-label">derniers rapports</p>
-        </div>
+        {stats.map((stat, index) => (
+          <div
+            key={stat.id + index}
+            className="stat-card"
+            onClick={() => onNavigate(stat.id)}
+          >
+            <div 
+              className="stat-card-icon"
+              style={{ backgroundColor: stat.bgColor, color: stat.color }}
+            >
+              {stat.icon}
+            </div>
+            <div className="stat-card-value">{stat.value}</div>
+            <div className="stat-card-label">{stat.label}</div>
+            <span className="stat-card-arrow">→</span>
+          </div>
+        ))}
       </div>
 
-      <div className="dashboard-section">
-        <h2>Rapports récents</h2>
-        {recentReports.length > 0 ? (
-          <table className="reports-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>PPN</th>
-                <th>District</th>
-                <th>Prix min (unitaire)</th>
-                <th>Prix max (unitaire)</th>
-                <th>Observation</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentReports.map((report) => (
-                <tr key={report.id}>
-                  <td>{new Date(report.date).toLocaleDateString('fr-FR')}</td>
-                  <td>{report.ppnName}</td>
-                  <td>{report.district}</td>
-                  <td>{report.minUnitPrice}</td>
-                  <td>{report.maxUnitPrice}</td>
-                  <td>{report.observation}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <div className="empty-state">
-            <p>Aucun rapport saisi pour le moment.</p>
-          </div>
-        )}
+      <div className="section-card">
+        <div className="section-header">
+          <h2 className="section-title">
+            <span>📋</span>
+            Mes derniers rapports
+          </h2>
+          <button
+            className="btn btn-primary"
+            onClick={() => onNavigate('add-report')}
+          >
+            + Nouveau rapport
+          </button>
+        </div>
+        <div className="section-body no-padding">
+          {recentReports.length > 0 ? (
+            <div className="table-container">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Produit</th>
+                    <th>Prix</th>
+                    <th>District</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentReports.map(report => (
+                    <tr key={report.id}>
+                      <td>{report.ppnName}</td>
+                      <td style={{ fontWeight: 600 }}>{report.price.toLocaleString()} Ar</td>
+                      <td>{report.district}</td>
+                      <td>{new Date(report.date).toLocaleDateString('fr-FR')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="empty-state">
+              <div className="empty-state-icon">📋</div>
+              <p>Aucun rapport pour le moment</p>
+              <button
+                className="btn btn-primary"
+                onClick={() => onNavigate('add-report')}
+                style={{ marginTop: '1rem' }}
+              >
+                Creer mon premier rapport
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

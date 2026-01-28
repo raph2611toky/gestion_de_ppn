@@ -1,29 +1,20 @@
 'use client';
 
 import React from 'react'
-import { useAuth } from '../contexts/AuthContext'
 import '../styles/header.css'
 
-function Header({ pageTitle, onLogout }) {
-  const { user } = useAuth()
-
+function Header({ title, onThemeToggle, theme }) {
   return (
     <header className="header">
-      <div className="header-content">
-        <h1 className="page-title">{pageTitle}</h1>
-
-        <div className="header-right">
-          <div className="user-status">
-            <span className="role-badge">
-              {user?.role === 'admin' ? 'Admin' : 'Région'}
-            </span>
-            <span className="username">{user?.fullName}</span>
-          </div>
-
-          <button onClick={onLogout} className="btn-logout">
-            Déconnexion
-          </button>
-        </div>
+      <h1 className="header-title">{title}</h1>
+      <div className="header-actions">
+        <button
+          className="header-btn"
+          onClick={onThemeToggle}
+          title={theme === 'light' ? 'Mode sombre' : 'Mode clair'}
+        >
+          {theme === 'light' ? '🌙' : '☀️'}
+        </button>
       </div>
     </header>
   )

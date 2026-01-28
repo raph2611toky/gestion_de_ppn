@@ -1,301 +1,217 @@
 'use client';
 
 import React, { useState } from 'react'
-import { useData } from '../contexts/DataContext'
-import '../styles/ppn-management.css'
+import { useData } from '../contexts/DataContext.jsx'
+import { useNotification, Modal, ConfirmDialog } from '../components/Notifications.jsx'
 
 function PPNManagement() {
-  const { ppns, addPpn, updatePpn, deletePpn } = useData()
-  const [showForm, setShowForm] = useState(false)
-  const [editingId, setEditingId] = useState(null)
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    unitMeasure: '',
-    bulkMeasure: '',
-    bulkSize: '',
-    observation: '',
-  })
-  const [errors, setErrors] = useState({})
+  const { ppnList, addPPN, updatePPN, deletePPN } = useData()
+  const { showNotification } = useNotification()
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [selectedPPN, setSelectedPPN] = useState(null)
+  const [formData, setFormData] = useState({ name: '', unit: '', category: '' })
 
-  const handleFormChange = (e) => {
-    const { name, value } = e.target
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }))
-    if (errors[name]) {
-      setErrors((prev) => {
-        const newErrors = { ...prev }
-        delete newErrors[name]
-        return newErrors
-      })
+  const categories = ['Cereales', 'Huiles', 'Epicerie', 'Produits laitiers', 'Viandes', 'Legumes', 'Fruits']
+  const units = ['kg', 'litre', 'unite', 'boite', 'paquet', 'bouteille']
+
+  const handleAdd = () => {
+    if (!formData.name || !formData.unit || !formData.category) {
+      showNotification('error', 'Veuillez remplir tous les champs')
+      return
     }
+    addPPN(formData)
+    showNotification('success', 'Produit PPN ajoute avec succes')
+    setShowAddModal(false)
+    setFormData({ name: '', unit: '', category: '' })
   }
 
-  const validateForm = () => {
-    const newErrors = {}
-    if (!formData.name.trim()) newErrors.name = 'Nom requis'
-    if (!formData.description.trim()) newErrors.description = 'Description requise'
-    if (!formData.unitMeasure) newErrors.unitMeasure = 'Unité requise'
-    if (!formData.bulkMeasure) newErrors.bulkMeasure = 'Unité de gros requise'
-    if (!formData.bulkSize || isNaN(formData.bulkSize) || formData.bulkSize <= 0) {
-      newErrors.bulkSize = 'Taille de gros valide requise'
+  const handleEdit = () => {
+    if (!selectedPPN || !formData.name || !formData.unit || !formData.category) {
+      showNotification('error', 'Veuillez remplir tous les champs')
+      return
     }
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+    updatePPN(selectedPPN.id, formData)
+    showNotification('success', 'Produit PPN modifie avec succes')
+    setShowEditModal(false)
+    setSelectedPPN(null)
+    setFormData({ name: '', unit: '', category: '' })
   }
 
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    if (!validateForm()) return
-
-    if (editingId) {
-      updatePpn(editingId, {
-        ...formData,
-        bulkSize: Number(formData.bulkSize),
-      })
-      setEditingId(null)
-    } else {
-      addPpn({
-        ...formData,
-        bulkSize: Number(formData.bulkSize),
-      })
-    }
-
-    setFormData({
-      name: '',
-      description: '',
-      unitMeasure: '',
-      bulkMeasure: '',
-      bulkSize: '',
-      observation: '',
-    })
-    setShowForm(false)
+  const handleDelete = () => {
+    if (!selectedPPN) return
+    deletePPN(selectedPPN.id)
+    showNotification('success', 'Produit PPN supprime avec succes')
+    setSelectedPPN(null)
   }
 
-  const handleEdit = (ppn) => {
-    setFormData({
-      name: ppn.name,
-      description: ppn.description,
-      unitMeasure: ppn.unitMeasure,
-      bulkMeasure: ppn.bulkMeasure,
-      bulkSize: ppn.bulkSize,
-      observation: ppn.observation || '',
-    })
-    setEditingId(ppn.id)
-    setShowForm(true)
+  const openEditModal = (ppn) => {
+    setSelectedPPN(ppn)
+    setFormData({ name: ppn.name, unit: ppn.unit, category: ppn.category })
+    setShowEditModal(true)
   }
 
-  const handleDelete = (ppnId) => {
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce PPN?')) {
-      deletePpn(ppnId)
-    }
+  const openDeleteConfirm = (ppn) => {
+    setSelectedPPN(ppn)
+    setShowDeleteConfirm(true)
   }
 
-  const handleCancel = () => {
-    setShowForm(false)
-    setEditingId(null)
-    setFormData({
-      name: '',
-      description: '',
-      unitMeasure: '',
-      bulkMeasure: '',
-      bulkSize: '',
-      observation: '',
-    })
-    setErrors({})
-  }
+  const PPNForm = () => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div className="form-group" style={{ marginBottom: 0 }}>
+        <label className="form-label">Nom du produit *</label>
+        <input
+          type="text"
+          className="form-input"
+          placeholder="Ex: Riz local"
+          value={formData.name}
+          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+        />
+      </div>
+      <div className="form-group" style={{ marginBottom: 0 }}>
+        <label className="form-label">Unite de mesure *</label>
+        <select
+          className="form-select"
+          value={formData.unit}
+          onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+        >
+          <option value="">Selectionner une unite</option>
+          {units.map(unit => (
+            <option key={unit} value={unit}>{unit}</option>
+          ))}
+        </select>
+      </div>
+      <div className="form-group" style={{ marginBottom: 0 }}>
+        <label className="form-label">Categorie *</label>
+        <select
+          className="form-select"
+          value={formData.category}
+          onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+        >
+          <option value="">Selectionner une categorie</option>
+          {categories.map(cat => (
+            <option key={cat} value={cat}>{cat}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+  )
 
   return (
-    <div className="ppn-management-container">
-      <div className="ppn-header">
-        <h2>Gestion des PPN</h2>
-        {!showForm && (
+    <div className="animate-fade-in">
+      <div className="section-card">
+        <div className="section-header">
+          <h2 className="section-title">
+            <span>📦</span>
+            Liste des produits PPN ({ppnList.length})
+          </h2>
           <button
-            className="btn-primary"
-            onClick={() => setShowForm(true)}
+            className="btn btn-primary"
+            onClick={() => setShowAddModal(true)}
           >
-            Ajouter un PPN
+            + Ajouter un PPN
           </button>
-        )}
-      </div>
-
-      {showForm && (
-        <div className="ppn-form-card">
-          <h3>{editingId ? 'Modifier le PPN' : 'Ajouter un nouveau PPN'}</h3>
-
-          <form onSubmit={handleSubmit} className="ppn-form">
-            <div className="form-group">
-              <label htmlFor="name">Nom du PPN *</label>
-              <input
-                id="name"
-                type="text"
-                name="name"
-                placeholder="Ex: Riz blanc"
-                value={formData.name}
-                onChange={handleFormChange}
-                className={`form-control ${errors.name ? 'has-error' : ''}`}
-              />
-              {errors.name && <span className="error-text">{errors.name}</span>}
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="description">Description *</label>
-              <textarea
-                id="description"
-                name="description"
-                placeholder="Décrivez le PPN"
-                value={formData.description}
-                onChange={handleFormChange}
-                className={`form-control ${errors.description ? 'has-error' : ''}`}
-              />
-              {errors.description && (
-                <span className="error-text">{errors.description}</span>
-              )}
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="unitMeasure">Unité unitaire *</label>
-                <select
-                  id="unitMeasure"
-                  name="unitMeasure"
-                  value={formData.unitMeasure}
-                  onChange={handleFormChange}
-                  className={`form-control ${errors.unitMeasure ? 'has-error' : ''}`}
-                >
-                  <option value="">-- Sélectionner --</option>
-                  <option value="kilogramme">Kilogramme</option>
-                  <option value="gramme">Gramme</option>
-                  <option value="litre">Litre</option>
-                  <option value="millilitre">Millilitre</option>
-                  <option value="unité">Unité</option>
-                </select>
-                {errors.unitMeasure && (
-                  <span className="error-text">{errors.unitMeasure}</span>
-                )}
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="bulkMeasure">Unité de gros *</label>
-                <select
-                  id="bulkMeasure"
-                  name="bulkMeasure"
-                  value={formData.bulkMeasure}
-                  onChange={handleFormChange}
-                  className={`form-control ${errors.bulkMeasure ? 'has-error' : ''}`}
-                >
-                  <option value="">-- Sélectionner --</option>
-                  <option value="sac">Sac</option>
-                  <option value="bidon">Bidon</option>
-                  <option value="carton">Carton</option>
-                  <option value="bouteille">Bouteille</option>
-                  <option value="caisse">Caisse</option>
-                </select>
-                {errors.bulkMeasure && (
-                  <span className="error-text">{errors.bulkMeasure}</span>
-                )}
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="bulkSize">Taille de gros *</label>
-                <input
-                  id="bulkSize"
-                  type="number"
-                  name="bulkSize"
-                  placeholder="Ex: 50"
-                  value={formData.bulkSize}
-                  onChange={handleFormChange}
-                  className={`form-control ${errors.bulkSize ? 'has-error' : ''}`}
-                />
-                {errors.bulkSize && (
-                  <span className="error-text">{errors.bulkSize}</span>
-                )}
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="observation">Observations</label>
-              <textarea
-                id="observation"
-                name="observation"
-                placeholder="Observations optionnelles"
-                value={formData.observation}
-                onChange={handleFormChange}
-                className="form-control"
-              />
-            </div>
-
-            <div className="form-actions">
-              <button
-                type="submit"
-                className="btn-primary"
-              >
-                {editingId ? 'Mettre à jour' : 'Créer le PPN'}
-              </button>
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={handleCancel}
-              >
-                Annuler
-              </button>
-            </div>
-          </form>
         </div>
-      )}
-
-      <div className="ppn-list-card">
-        <h3>Liste des PPN ({ppns.length})</h3>
-        {ppns.length > 0 ? (
-          <table className="ppn-table">
-            <thead>
-              <tr>
-                <th>Nom</th>
-                <th>Description</th>
-                <th>Unité</th>
-                <th>Gros (unité)</th>
-                <th>Taille gros</th>
-                <th>Observations</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ppns.map((ppn) => (
-                <tr key={ppn.id}>
-                  <td>
-                    <strong>{ppn.name}</strong>
-                  </td>
-                  <td>{ppn.description}</td>
-                  <td>{ppn.unitMeasure}</td>
-                  <td>{ppn.bulkMeasure}</td>
-                  <td>{ppn.bulkSize}</td>
-                  <td>{ppn.observation || '-'}</td>
-                  <td className="actions-cell">
-                    <button
-                      className="btn-primary btn-small"
-                      onClick={() => handleEdit(ppn)}
-                    >
-                      Modifier
-                    </button>
-                    <button
-                      className="btn-danger btn-small"
-                      onClick={() => handleDelete(ppn.id)}
-                    >
-                      Supprimer
-                    </button>
-                  </td>
+        <div className="section-body no-padding">
+          <div className="table-container">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Nom du produit</th>
+                  <th>Unite</th>
+                  <th>Categorie</th>
+                  <th>Date creation</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <div className="empty-state">
-            <p>Aucun PPN. Créez-en un pour commencer.</p>
+              </thead>
+              <tbody>
+                {ppnList.map(ppn => (
+                  <tr key={ppn.id}>
+                    <td style={{ fontWeight: 500 }}>{ppn.name}</td>
+                    <td>{ppn.unit}</td>
+                    <td>
+                      <span className="badge badge-info">{ppn.category}</span>
+                    </td>
+                    <td>{new Date(ppn.createdAt).toLocaleDateString('fr-FR')}</td>
+                    <td>
+                      <button
+                        className="action-btn action-btn-edit"
+                        onClick={() => openEditModal(ppn)}
+                      >
+                        Modifier
+                      </button>
+                      <button
+                        className="action-btn action-btn-delete"
+                        onClick={() => openDeleteConfirm(ppn)}
+                      >
+                        Supprimer
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        )}
+        </div>
       </div>
+
+      {/* Add Modal */}
+      <Modal
+        isOpen={showAddModal}
+        onClose={() => { setShowAddModal(false); setFormData({ name: '', unit: '', category: '' }) }}
+        title="Ajouter un produit PPN"
+        icon="📦"
+        footer={
+          <>
+            <button
+              className="modal-btn modal-btn-secondary"
+              onClick={() => { setShowAddModal(false); setFormData({ name: '', unit: '', category: '' }) }}
+            >
+              Annuler
+            </button>
+            <button className="modal-btn modal-btn-primary" onClick={handleAdd}>
+              Ajouter
+            </button>
+          </>
+        }
+      >
+        <PPNForm />
+      </Modal>
+
+      {/* Edit Modal */}
+      <Modal
+        isOpen={showEditModal}
+        onClose={() => { setShowEditModal(false); setSelectedPPN(null); setFormData({ name: '', unit: '', category: '' }) }}
+        title="Modifier le produit PPN"
+        icon="✏️"
+        footer={
+          <>
+            <button
+              className="modal-btn modal-btn-secondary"
+              onClick={() => { setShowEditModal(false); setSelectedPPN(null); setFormData({ name: '', unit: '', category: '' }) }}
+            >
+              Annuler
+            </button>
+            <button className="modal-btn modal-btn-primary" onClick={handleEdit}>
+              Enregistrer
+            </button>
+          </>
+        }
+      >
+        <PPNForm />
+      </Modal>
+
+      {/* Delete Confirmation */}
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => { setShowDeleteConfirm(false); setSelectedPPN(null) }}
+        onConfirm={handleDelete}
+        title="Supprimer le produit"
+        message={`Etes-vous sur de vouloir supprimer "${selectedPPN?.name}" ? Cette action est irreversible et supprimera egalement tous les rapports de prix associes.`}
+        confirmText="Supprimer"
+        confirmStyle="danger"
+      />
     </div>
   )
 }

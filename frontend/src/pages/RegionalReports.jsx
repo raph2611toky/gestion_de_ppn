@@ -1,166 +1,103 @@
 'use client';
 
 import React, { useState } from 'react'
-import { useAuth } from '../contexts/AuthContext'
-import { useData } from '../contexts/DataContext'
-import '../styles/reports.css'
+import { useAuth } from '../contexts/AuthContext.jsx'
+import { useData } from '../contexts/DataContext.jsx'
 
-function RegionalReports() {
+function RegionalReports({ onNavigate }) {
   const { user } = useAuth()
-  const { reports, deleteReport } = useData()
-  const [filterDistrict, setFilterDistrict] = useState('')
-  const [filterPpn, setFilterPpn] = useState('')
-  const [filterRegion, setFilterRegion] = useState('')
+  const { priceReports, ppnList } = useData()
+  const [filterPPN, setFilterPPN] = useState('')
+  const [filterMonth, setFilterMonth] = useState('')
 
-  const regionReports = reports.filter((r) => r.regionId === user.id)
-  const otherRegionReports = reports.filter((r) => r.regionId !== user.id)
+  const myReports = priceReports.filter(r => r.region === user?.region)
 
-  let filteredRegionReports = regionReports
-  if (filterDistrict) {
-    filteredRegionReports = filteredRegionReports.filter(
-      (r) => r.district.toLowerCase().includes(filterDistrict.toLowerCase())
-    )
-  }
-  if (filterPpn) {
-    filteredRegionReports = filteredRegionReports.filter(
-      (r) => r.ppnId === filterPpn
-    )
-  }
-
-  let filteredOtherReports = otherRegionReports
-  if (filterRegion) {
-    filteredOtherReports = filteredOtherReports.filter(
-      (r) => r.regionId === filterRegion
-    )
-  }
-
-  const districts = [...new Set(regionReports.map((r) => r.district))]
-  const ppnIds = [...new Set(regionReports.map((r) => r.ppnId))]
-  const uniqueRegions = [...new Set(otherRegionReports.map((r) => r.regionId))]
-
-  const handleDelete = (reportId) => {
-    if (
-      window.confirm('Êtes-vous sûr de vouloir supprimer ce rapport?')
-    ) {
-      deleteReport(reportId)
-    }
-  }
-
-  const ReportTable = ({ reports, title, showDelete = false }) => (
-    <div className="reports-section">
-      <h3>{title}</h3>
-      {reports.length > 0 ? (
-        <table className="reports-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>PPN</th>
-              <th>District</th>
-              <th>Prix min</th>
-              <th>Prix max</th>
-              <th>Gros min</th>
-              <th>Gros max</th>
-              <th>Observation</th>
-              {showDelete && <th>Actions</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {reports.map((report) => (
-              <tr key={report.id}>
-                <td>{new Date(report.date).toLocaleDateString('fr-FR')}</td>
-                <td>{report.ppnName}</td>
-                <td>{report.district}</td>
-                <td>{report.minUnitPrice}</td>
-                <td>{report.maxUnitPrice}</td>
-                <td>{report.minBulkPrice}</td>
-                <td>{report.maxBulkPrice}</td>
-                <td>{report.observation}</td>
-                {showDelete && (
-                  <td>
-                    <button
-                      className="btn-danger btn-small"
-                      onClick={() => handleDelete(report.id)}
-                    >
-                      Supprimer
-                    </button>
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        <div className="empty-state">
-          <p>Aucun rapport à afficher</p>
-        </div>
-      )}
-    </div>
-  )
+  const filteredReports = myReports.filter(report => {
+    const matchesPPN = !filterPPN || report.ppnId === filterPPN
+    const matchesMonth = !filterMonth || report.date.startsWith(filterMonth)
+    return matchesPPN && matchesMonth
+  })
 
   return (
-    <div className="reports-container">
-      <div className="reports-header">
-        <h2>Mes rapports</h2>
+    <div className="animate-fade-in">
+      {/* Filters */}
+      <div className="filters-container">
         <div className="filter-group">
-          <input
-            type="text"
-            placeholder="Filtrer par district"
-            value={filterDistrict}
-            onChange={(e) => setFilterDistrict(e.target.value)}
-            className="filter-input"
-          />
+          <label className="filter-label">Produit</label>
           <select
-            value={filterPpn}
-            onChange={(e) => setFilterPpn(e.target.value)}
             className="filter-select"
+            value={filterPPN}
+            onChange={(e) => setFilterPPN(e.target.value)}
           >
-            <option value="">Tous les PPN</option>
-            {ppnIds.map((ppnId) => {
-              const ppn = reports.find((r) => r.ppnId === ppnId)
-              return (
-                <option key={ppnId} value={ppnId}>
-                  {ppn?.ppnName}
-                </option>
-              )
-            })}
+            <option value="">Tous les produits</option>
+            {ppnList.map(ppn => (
+              <option key={ppn.id} value={ppn.id}>{ppn.name}</option>
+            ))}
           </select>
+        </div>
+
+        <div className="filter-group">
+          <label className="filter-label">Mois</label>
+          <input
+            type="month"
+            className="filter-input"
+            value={filterMonth}
+            onChange={(e) => setFilterMonth(e.target.value)}
+          />
+        </div>
+
+        <div style={{ marginLeft: 'auto' }}>
+          <button
+            className="btn btn-primary"
+            onClick={() => onNavigate('add-report')}
+          >
+            + Nouveau rapport
+          </button>
         </div>
       </div>
 
-      <ReportTable
-        reports={filteredRegionReports}
-        title={`Rapports de la région (${filteredRegionReports.length})`}
-        showDelete={true}
-      />
-
-      <div className="reports-divider" />
-
-      <h2>Rapports des autres régions</h2>
-      <div className="filter-group">
-        <select
-          value={filterRegion}
-          onChange={(e) => setFilterRegion(e.target.value)}
-          className="filter-select"
-        >
-          <option value="">Toutes les régions</option>
-          {uniqueRegions.map((regionId) => {
-            const region = otherRegionReports.find(
-              (r) => r.regionId === regionId
-            )
-            return (
-              <option key={regionId} value={regionId}>
-                {region?.regionName}
-              </option>
-            )
-          })}
-        </select>
+      {/* Reports Table */}
+      <div className="section-card">
+        <div className="section-header">
+          <h2 className="section-title">
+            <span>📋</span>
+            Mes rapports de prix ({filteredReports.length})
+          </h2>
+        </div>
+        <div className="section-body no-padding">
+          {filteredReports.length > 0 ? (
+            <div className="table-container">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Produit</th>
+                    <th>Prix</th>
+                    <th>District</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredReports.map(report => (
+                    <tr key={report.id}>
+                      <td style={{ fontWeight: 500 }}>{report.ppnName}</td>
+                      <td style={{ fontWeight: 600, color: 'var(--primary)' }}>
+                        {report.price.toLocaleString()} Ar
+                      </td>
+                      <td>{report.district}</td>
+                      <td>{new Date(report.date).toLocaleDateString('fr-FR')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="empty-state">
+              <div className="empty-state-icon">📋</div>
+              <p>Aucun rapport trouve</p>
+            </div>
+          )}
+        </div>
       </div>
-
-      <ReportTable
-        reports={filteredOtherReports}
-        title={`Rapports en lecture seule (${filteredOtherReports.length})`}
-        showDelete={false}
-      />
     </div>
   )
 }

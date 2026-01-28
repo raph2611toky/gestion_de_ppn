@@ -1,207 +1,155 @@
 'use client';
 
-import React, { useState, useMemo } from 'react'
-import { useData } from '../contexts/DataContext'
-import SimpleChart from '../components/SimpleChart'
-import '../styles/analytics.css'
+import React, { useState } from 'react'
+import { useData, REGIONS } from '../contexts/DataContext.jsx'
+import { BarChart, LineChart } from '../components/SimpleChart.jsx'
 
 function Analytics() {
-  const { reports } = useData()
-  const [filterRegion, setFilterRegion] = useState('')
-  const [filterMonth, setFilterMonth] = useState('')
+  const { priceReports, ppnList } = useData()
+  const [selectedPPN, setSelectedPPN] = useState('')
+  const [selectedRegion, setSelectedRegion] = useState('')
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date()
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  })
 
-  const filteredReports = useMemo(() => {
-    let filtered = reports
+  // Filter reports
+  const filteredReports = priceReports.filter(report => {
+    const reportDate = new Date(report.date)
+    const reportMonth = `${reportDate.getFullYear()}-${String(reportDate.getMonth() + 1).padStart(2, '0')}`
+    
+    const matchesPPN = !selectedPPN || report.ppnId === selectedPPN
+    const matchesRegion = !selectedRegion || report.region === selectedRegion
+    const matchesMonth = !selectedMonth || reportMonth === selectedMonth
+    
+    return matchesPPN && matchesRegion && matchesMonth
+  })
 
-    if (filterRegion) {
-      filtered = filtered.filter((r) => r.regionId === filterRegion)
-    }
+  // Prepare chart data - by region
+  const regionData = REGIONS.slice(0, 6).map(region => {
+    const regionReports = filteredReports.filter(r => r.region === region)
+    const avgPrice = regionReports.length > 0 
+      ? Math.round(regionReports.reduce((sum, r) => sum + r.price, 0) / regionReports.length)
+      : 0
+    return { label: region.slice(0, 8), value: avgPrice }
+  }).filter(d => d.value > 0)
 
-    if (filterMonth) {
-      filtered = filtered.filter((r) => {
-        const reportDate = new Date(r.date)
-        return reportDate.toISOString().startsWith(filterMonth)
-      })
-    }
-
-    return filtered
-  }, [reports, filterRegion, filterMonth])
-
-  const uniqueRegions = [...new Set(reports.map((r) => r.regionId))]
-  const uniqueMonths = [
-    ...new Set(
-      reports.map((r) => new Date(r.date).toISOString().split('T')[0].slice(0, 7))
-    ),
-  ].sort().reverse()
-
-  const getPricesByPpn = () => {
-    const ppnPrices = {}
-    filteredReports.forEach((report) => {
-      if (!ppnPrices[report.ppnName]) {
-        ppnPrices[report.ppnName] = {
-          minPrices: [],
-          maxPrices: [],
-          avgMin: 0,
-          avgMax: 0,
-        }
-      }
-      ppnPrices[report.ppnName].minPrices.push(report.minUnitPrice)
-      ppnPrices[report.ppnName].maxPrices.push(report.maxUnitPrice)
+  // Prepare chart data - by date (for line chart)
+  const dateData = (() => {
+    const groupedByDate = {}
+    filteredReports.forEach(report => {
+      const date = report.date.slice(0, 10)
+      if (!groupedByDate[date]) groupedByDate[date] = []
+      groupedByDate[date].push(report.price)
     })
-
-    Object.keys(ppnPrices).forEach((ppnName) => {
-      const prices = ppnPrices[ppnName]
-      prices.avgMin = Math.round(
-        prices.minPrices.reduce((a, b) => a + b, 0) / prices.minPrices.length
-      )
-      prices.avgMax = Math.round(
-        prices.maxPrices.reduce((a, b) => a + b, 0) / prices.maxPrices.length
-      )
-    })
-
-    return ppnPrices
-  }
-
-  const getPricesByRegion = () => {
-    const regionPrices = {}
-    filteredReports.forEach((report) => {
-      if (!regionPrices[report.regionName]) {
-        regionPrices[report.regionName] = {
-          minPrices: [],
-          maxPrices: [],
-          avgMin: 0,
-          avgMax: 0,
-        }
-      }
-      regionPrices[report.regionName].minPrices.push(report.minUnitPrice)
-      regionPrices[report.regionName].maxPrices.push(report.maxUnitPrice)
-    })
-
-    Object.keys(regionPrices).forEach((regionName) => {
-      const prices = regionPrices[regionName]
-      prices.avgMin = Math.round(
-        prices.minPrices.reduce((a, b) => a + b, 0) / prices.minPrices.length
-      )
-      prices.avgMax = Math.round(
-        prices.maxPrices.reduce((a, b) => a + b, 0) / prices.maxPrices.length
-      )
-    })
-
-    return regionPrices
-  }
-
-  const ppnPrices = getPricesByPpn()
-  const regionPrices = getPricesByRegion()
+    
+    return Object.entries(groupedByDate)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-7)
+      .map(([date, prices]) => ({
+        label: new Date(date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }),
+        value: Math.round(prices.reduce((a, b) => a + b, 0) / prices.length)
+      }))
+  })()
 
   return (
-    <div className="analytics-container">
-      <div className="analytics-filters">
-        <select
-          value={filterRegion}
-          onChange={(e) => setFilterRegion(e.target.value)}
-          className="filter-select"
-        >
-          <option value="">Toutes les régions</option>
-          {uniqueRegions.map((regionId) => {
-            const region = reports.find((r) => r.regionId === regionId)
-            return (
-              <option key={regionId} value={regionId}>
-                {region?.regionName}
-              </option>
-            )
-          })}
-        </select>
-
-        <select
-          value={filterMonth}
-          onChange={(e) => setFilterMonth(e.target.value)}
-          className="filter-select"
-        >
-          <option value="">Tous les mois</option>
-          {uniqueMonths.map((month) => (
-            <option key={month} value={month}>
-              {new Date(`${month}-01`).toLocaleDateString('fr-FR', {
-                year: 'numeric',
-                month: 'long',
-              })}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="analytics-grid">
-        <div className="analytics-section">
-          <h2>Prix par PPN</h2>
-          {Object.keys(ppnPrices).length > 0 ? (
-            <SimpleChart
-              data={Object.entries(ppnPrices).map(([name, data]) => ({
-                name,
-                min: data.avgMin,
-                max: data.avgMax,
-              }))}
-              title="Prix min/max par produit"
-            />
-          ) : (
-            <div className="empty-state">
-              <p>Aucune donnée à afficher</p>
-            </div>
-          )}
+    <div className="animate-fade-in">
+      {/* Filters */}
+      <div className="filters-container">
+        <div className="filter-group">
+          <label className="filter-label">Produit PPN</label>
+          <select
+            className="filter-select"
+            value={selectedPPN}
+            onChange={(e) => setSelectedPPN(e.target.value)}
+          >
+            <option value="">Tous les produits</option>
+            {ppnList.map(ppn => (
+              <option key={ppn.id} value={ppn.id}>{ppn.name}</option>
+            ))}
+          </select>
         </div>
 
-        <div className="analytics-section">
-          <h2>Prix par région</h2>
-          {Object.keys(regionPrices).length > 0 ? (
-            <SimpleChart
-              data={Object.entries(regionPrices).map(([name, data]) => ({
-                name,
-                min: data.avgMin,
-                max: data.avgMax,
-              }))}
-              title="Prix min/max par région"
-            />
-          ) : (
-            <div className="empty-state">
-              <p>Aucune donnée à afficher</p>
-            </div>
-          )}
+        <div className="filter-group">
+          <label className="filter-label">Region</label>
+          <select
+            className="filter-select"
+            value={selectedRegion}
+            onChange={(e) => setSelectedRegion(e.target.value)}
+          >
+            <option value="">Toutes les regions</option>
+            {REGIONS.map(region => (
+              <option key={region} value={region}>{region}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="filter-group">
+          <label className="filter-label">Mois</label>
+          <input
+            type="month"
+            className="filter-input"
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+          />
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+          <span className="filter-badge">
+            {filteredReports.length} rapport(s)
+          </span>
         </div>
       </div>
 
-      <div className="analytics-table-section">
-        <h2>Détails des prix par PPN</h2>
-        {Object.keys(ppnPrices).length > 0 ? (
-          <table className="analytics-table">
-            <thead>
-              <tr>
-                <th>PPN</th>
-                <th>Prix min moyen</th>
-                <th>Prix max moyen</th>
-                <th>Écart</th>
-                <th>Rapports</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(ppnPrices).map(([ppnName, data]) => {
-                const spread = data.avgMax - data.avgMin
-                return (
-                  <tr key={ppnName}>
-                    <td>
-                      <strong>{ppnName}</strong>
-                    </td>
-                    <td>{data.avgMin}</td>
-                    <td>{data.avgMax}</td>
-                    <td>{spread}</td>
-                    <td>{data.minPrices.length}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        ) : (
+      {/* Charts */}
+      {filteredReports.length > 0 ? (
+        <div className="charts-container">
+          <BarChart data={regionData} title="Prix moyen par region (Ar)" />
+          <LineChart data={dateData} title="Evolution des prix" />
+        </div>
+      ) : (
+        <div className="section-card">
           <div className="empty-state">
-            <p>Aucune donnée à afficher</p>
+            <div className="empty-state-icon">📊</div>
+            <p>Aucune donnee disponible pour les filtres selectionnes</p>
           </div>
-        )}
+        </div>
+      )}
+
+      {/* Data Table */}
+      <div className="section-card" style={{ marginTop: '1.5rem' }}>
+        <div className="section-header">
+          <h2 className="section-title">
+            <span>📋</span>
+            Detail des rapports
+          </h2>
+        </div>
+        <div className="section-body no-padding">
+          <div className="table-container">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Produit</th>
+                  <th>Prix</th>
+                  <th>Region</th>
+                  <th>District</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredReports.slice(0, 10).map(report => (
+                  <tr key={report.id}>
+                    <td>{report.ppnName}</td>
+                    <td style={{ fontWeight: 600 }}>{report.price.toLocaleString()} Ar</td>
+                    <td>{report.region}</td>
+                    <td>{report.district}</td>
+                    <td>{new Date(report.date).toLocaleDateString('fr-FR')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   )
