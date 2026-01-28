@@ -11,7 +11,10 @@ function AddReport({ onNavigate }) {
   const { showNotification } = useNotification()
   const [formData, setFormData] = useState({
     ppnId: '',
-    price: '',
+    prix_unitaire_min: '',
+    prix_unitaire_max: '',
+    prix_gros_min: '',
+    prix_gros_max: '',
     district: '',
     date: new Date().toISOString().split('T')[0],
   })
@@ -23,12 +26,22 @@ function AddReport({ onNavigate }) {
     e.preventDefault()
     setError('')
 
-    if (!formData.ppnId || !formData.price || !formData.district || !formData.date) {
+    if (!formData.ppnId || !formData.prix_unitaire_min || !formData.prix_unitaire_max ||
+        !formData.prix_gros_min || !formData.prix_gros_max || !formData.district || !formData.date) {
       setError('Veuillez remplir tous les champs')
       return
     }
 
-    // Validate date is not in the future
+    if (parseFloat(formData.prix_unitaire_min) > parseFloat(formData.prix_unitaire_max)) {
+      setError('Le prix unitaire minimum ne peut pas etre superieur au maximum')
+      return
+    }
+
+    if (parseFloat(formData.prix_gros_min) > parseFloat(formData.prix_gros_max)) {
+      setError('Le prix gros minimum ne peut pas etre superieur au maximum')
+      return
+    }
+
     if (formData.date > today) {
       setError('La date ne peut pas etre dans le futur')
       return
@@ -43,7 +56,11 @@ function AddReport({ onNavigate }) {
     addPriceReport({
       ppnId: formData.ppnId,
       ppnName: selectedPPN.name,
-      price: parseFloat(formData.price),
+      prix_unitaire_min: parseFloat(formData.prix_unitaire_min),
+      prix_unitaire_max: parseFloat(formData.prix_unitaire_max),
+      prix_gros_min: parseFloat(formData.prix_gros_min),
+      prix_gros_max: parseFloat(formData.prix_gros_max),
+      price: (parseFloat(formData.prix_unitaire_min) + parseFloat(formData.prix_unitaire_max)) / 2,
       region: user?.region || '',
       district: formData.district,
       date: formData.date,
@@ -86,16 +103,60 @@ function AddReport({ onNavigate }) {
               </select>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Prix (Ariary) *</label>
-              <input
-                type="number"
-                className="form-input"
-                placeholder="Ex: 2500"
-                value={formData.price}
-                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                min="0"
-              />
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Prix unitaire min (Ar) *</label>
+                <input
+                  type="number"
+                  className="form-input"
+                  placeholder="Ex: 2000"
+                  value={formData.prix_unitaire_min}
+                  onChange={(e) => setFormData({ ...formData, prix_unitaire_min: e.target.value })}
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Prix unitaire max (Ar) *</label>
+                <input
+                  type="number"
+                  className="form-input"
+                  placeholder="Ex: 2500"
+                  value={formData.prix_unitaire_max}
+                  onChange={(e) => setFormData({ ...formData, prix_unitaire_max: e.target.value })}
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Prix gros min (Ar) *</label>
+                <input
+                  type="number"
+                  className="form-input"
+                  placeholder="Ex: 1800"
+                  value={formData.prix_gros_min}
+                  onChange={(e) => setFormData({ ...formData, prix_gros_min: e.target.value })}
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Prix gros max (Ar) *</label>
+                <input
+                  type="number"
+                  className="form-input"
+                  placeholder="Ex: 2200"
+                  value={formData.prix_gros_max}
+                  onChange={(e) => setFormData({ ...formData, prix_gros_max: e.target.value })}
+                  min="0"
+                  step="0.01"
+                />
+              </div>
             </div>
 
             <div className="form-group">

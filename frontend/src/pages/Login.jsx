@@ -9,21 +9,27 @@ function Login({ onThemeToggle, theme, onRegister }) {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
   const { login } = useAuth()
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
-    
+    setIsLoading(true)
+
     if (!username || !password) {
       setError('Veuillez remplir tous les champs')
+      setIsLoading(false)
       return
     }
 
-    const success = login(username, password)
-    if (!success) {
-      setError('Identifiants incorrects')
-    }
+    setTimeout(() => {
+      const success = login(username, password)
+      if (!success) {
+        setError('Identifiants incorrects')
+      }
+      setIsLoading(false)
+    }, 500)
   }
 
   return (
@@ -37,10 +43,9 @@ function Login({ onThemeToggle, theme, onRegister }) {
       </button>
 
       <div className="login-card">
-        <div className="login-header">
-          <div className="login-logo">📦</div>
-          <h1 className="login-title">PPN Manager</h1>
-          <p className="login-subtitle">Systeme de gestion des produits de premiere necessite</p>
+        <div className="login-header-simple">
+          <h1 className="login-title-simple">PPN Manager</h1>
+          <p className="login-subtitle-simple">Connexion</p>
         </div>
 
         <form className="login-form" onSubmit={handleSubmit}>
@@ -87,8 +92,15 @@ function Login({ onThemeToggle, theme, onRegister }) {
             </div>
           </div>
 
-          <button type="submit" className="login-submit">
-            Se connecter
+          <button type="submit" className="login-submit" disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <span className="spinner"></span>
+                Connexion...
+              </>
+            ) : (
+              'Se connecter'
+            )}
           </button>
         </form>
 
