@@ -165,39 +165,65 @@ function Register({ onBack }) {
             <div className="register-documents">
               <div className="document-upload">
                 <label className="upload-label">CIN - Recto *</label>
-                <label className="upload-input">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleFileChange(e, 'cinFront')}
-                  />
-                  <span className="upload-placeholder">
-                    {previews.cinFront ? 'CIN Recto selectionnee' : 'Cliquez pour ajouter'}
-                  </span>
-                </label>
-                {previews.cinFront && (
+                {previews.cinFront ? (
                   <div className="upload-preview">
-                    <img src={previews.cinFront} alt="Preview" />
+                    <img src={previews.cinFront} alt="CIN Recto" />
                   </div>
+                ) : (
+                  <label className="upload-input">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleFileChange(e, 'cinFront')}
+                    />
+                    <span className="upload-placeholder">
+                      <span>+ Cliquez pour ajouter</span>
+                    </span>
+                  </label>
+                )}
+                {previews.cinFront && (
+                  <label className="upload-input">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleFileChange(e, 'cinFront')}
+                    />
+                    <span className="upload-placeholder" style={{opacity: 0.7}}>
+                      <span>Changer l'image</span>
+                    </span>
+                  </label>
                 )}
               </div>
 
               <div className="document-upload">
                 <label className="upload-label">CIN - Verso *</label>
-                <label className="upload-input">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleFileChange(e, 'cinBack')}
-                  />
-                  <span className="upload-placeholder">
-                    {previews.cinBack ? 'CIN Verso selectionnee' : 'Cliquez pour ajouter'}
-                  </span>
-                </label>
-                {previews.cinBack && (
+                {previews.cinBack ? (
                   <div className="upload-preview">
-                    <img src={previews.cinBack} alt="Preview" />
+                    <img src={previews.cinBack} alt="CIN Verso" />
                   </div>
+                ) : (
+                  <label className="upload-input">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleFileChange(e, 'cinBack')}
+                    />
+                    <span className="upload-placeholder">
+                      <span>+ Cliquez pour ajouter</span>
+                    </span>
+                  </label>
+                )}
+                {previews.cinBack && (
+                  <label className="upload-input">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleFileChange(e, 'cinBack')}
+                    />
+                    <span className="upload-placeholder" style={{opacity: 0.7}}>
+                      <span>Changer l'image</span>
+                    </span>
+                  </label>
                 )}
               </div>
             </div>
@@ -220,20 +246,33 @@ function Register({ onBack }) {
             <div className="register-documents">
               <div className="document-upload">
                 <label className="upload-label">Photo de profil</label>
-                <label className="upload-input">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleFileChange(e, 'photo')}
-                  />
-                  <span className="upload-placeholder">
-                    {previews.photo ? 'Photo selectionnee' : 'Cliquez pour ajouter'}
-                  </span>
-                </label>
-                {previews.photo && (
+                {previews.photo ? (
                   <div className="upload-preview">
-                    <img src={previews.photo} alt="Preview" />
+                    <img src={previews.photo} alt="Photo de profil" />
                   </div>
+                ) : (
+                  <label className="upload-input">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleFileChange(e, 'photo')}
+                    />
+                    <span className="upload-placeholder">
+                      <span>+ Cliquez pour ajouter</span>
+                    </span>
+                  </label>
+                )}
+                {previews.photo && (
+                  <label className="upload-input">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleFileChange(e, 'photo')}
+                    />
+                    <span className="upload-placeholder" style={{opacity: 0.7}}>
+                      <span>Changer l'image</span>
+                    </span>
+                  </label>
                 )}
               </div>
             </div>
@@ -301,12 +340,13 @@ function Register({ onBack }) {
             <div className="form-actions-register">
               <button
                 type="button"
-                className="login-submit-secondary"
+                className="back-button"
                 onClick={handlePreviousStep}
               >
-                Retour
+                <span>←</span>
+                <span>Retour</span>
               </button>
-              <button type="submit" className="login-submit" disabled={isLoading}>
+              <button type="submit" className="login-submit" disabled={isLoading} style={{flex: 1}}>
                 {isLoading ? (
                   <>
                     <span className="spinner"></span>

@@ -9,6 +9,7 @@ function AccountValidation() {
   const { showNotification } = useNotification()
   const [showConfirm, setShowConfirm] = useState(false)
   const [confirmAction, setConfirmAction] = useState(null)
+  const [selectedAccount, setSelectedAccount] = useState(null)
 
   const handleStatusChange = (id, status, name) => {
     setConfirmAction({ id, status, name })
@@ -51,117 +52,224 @@ function AccountValidation() {
 
   return (
     <div className="animate-fade-in">
-      {/* Pending Accounts */}
-      <div className="section-card">
-        <div className="section-header">
-          <h2 className="section-title">
-            <span>⏳</span>
-            Demandes en attente ({pendingAccounts.length})
-          </h2>
-        </div>
-        <div className="section-body no-padding">
-          {pendingAccounts.length > 0 ? (
-            <div className="table-container">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Nom</th>
-                    <th>Utilisateur</th>
-                    <th>Region</th>
-                    <th>Date demande</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pendingAccounts.map(account => (
-                    <tr key={account.id}>
-                      <td style={{ fontWeight: 500 }}>{account.name}</td>
-                      <td>{account.username}</td>
-                      <td>{account.region}</td>
-                      <td>{new Date(account.createdAt).toLocaleDateString('fr-FR')}</td>
-                      <td>
-                        <button
-                          className="action-btn action-btn-success"
-                          onClick={() => handleStatusChange(account.id, 'approved', account.name)}
-                        >
-                          Approuver
-                        </button>
-                        <button
-                          className="action-btn action-btn-delete"
-                          onClick={() => handleStatusChange(account.id, 'revoked', account.name)}
-                        >
-                          Rejeter
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      {selectedAccount ? (
+        <div className="section-card">
+          <div className="section-header">
+            <button
+              className="back-button"
+              onClick={() => setSelectedAccount(null)}
+              style={{ marginRight: 'auto' }}
+            >
+              <span>←</span>
+              <span>Retour</span>
+            </button>
+            <h2 className="section-title">
+              <span>👤</span>
+              Details du compte
+            </h2>
+          </div>
+          <div className="section-body">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '2rem' }}>
+              <div>
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.5rem' }}>Nom complet</div>
+                  <div style={{ fontSize: '1rem', color: 'var(--text-primary)', fontWeight: 500 }}>{selectedAccount.name}</div>
+                </div>
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.5rem' }}>Nom d'utilisateur</div>
+                  <div style={{ fontSize: '1rem', color: 'var(--text-primary)', fontWeight: 500 }}>{selectedAccount.username}</div>
+                </div>
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.5rem' }}>Email</div>
+                  <div style={{ fontSize: '1rem', color: 'var(--text-primary)', fontWeight: 500 }}>{selectedAccount.email}</div>
+                </div>
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.5rem' }}>CIN</div>
+                  <div style={{ fontSize: '1rem', color: 'var(--text-primary)', fontWeight: 500 }}>{selectedAccount.cin}</div>
+                </div>
+              </div>
+              <div>
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.5rem' }}>Region</div>
+                  <div style={{ fontSize: '1rem', color: 'var(--text-primary)', fontWeight: 500 }}>{selectedAccount.region}</div>
+                </div>
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.5rem' }}>Statut</div>
+                  <span className={getStatusBadge(selectedAccount.status)}>
+                    {getStatusLabel(selectedAccount.status)}
+                  </span>
+                </div>
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.5rem' }}>Date demande</div>
+                  <div style={{ fontSize: '1rem', color: 'var(--text-primary)', fontWeight: 500 }}>{new Date(selectedAccount.createdAt).toLocaleDateString('fr-FR')}</div>
+                </div>
+              </div>
             </div>
-          ) : (
-            <div className="empty-state">
-              <div className="empty-state-icon">✓</div>
-              <p>Aucune demande en attente</p>
-            </div>
-          )}
-        </div>
-      </div>
 
-      {/* All Accounts */}
-      <div className="section-card">
-        <div className="section-header">
-          <h2 className="section-title">
-            <span>👥</span>
-            Tous les comptes ({accounts.length})
-          </h2>
-        </div>
-        <div className="section-body no-padding">
-          <div className="table-container">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Nom</th>
-                  <th>Utilisateur</th>
-                  <th>Region</th>
-                  <th>Statut</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...approvedAccounts, ...revokedAccounts].map(account => (
-                  <tr key={account.id}>
-                    <td style={{ fontWeight: 500 }}>{account.name}</td>
-                    <td>{account.username}</td>
-                    <td>{account.region}</td>
-                    <td>
-                      <span className={getStatusBadge(account.status)}>
-                        {getStatusLabel(account.status)}
-                      </span>
-                    </td>
-                    <td>
-                      {account.status === 'approved' ? (
-                        <button
-                          className="action-btn action-btn-delete"
-                          onClick={() => handleStatusChange(account.id, 'revoked', account.name)}
-                        >
-                          Revoquer
-                        </button>
-                      ) : (
-                        <button
-                          className="action-btn action-btn-success"
-                          onClick={() => handleStatusChange(account.id, 'approved', account.name)}
-                        >
-                          Reactiver
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {selectedAccount.photo && (
+              <div style={{ marginTop: '2rem', marginBottom: '1.5rem' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '1rem' }}>Photo de profil</div>
+                <img src={selectedAccount.photo} alt="Photo" style={{ width: '150px', height: '150px', borderRadius: '8px', objectFit: 'cover', border: '1px solid var(--border-color)' }} />
+              </div>
+            )}
+
+            {selectedAccount.cinFront && (
+              <div style={{ marginTop: '2rem', marginBottom: '1.5rem' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '1rem' }}>CIN - Recto</div>
+                <img src={selectedAccount.cinFront} alt="CIN Recto" style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '8px', border: '1px solid var(--border-color)' }} />
+              </div>
+            )}
+
+            {selectedAccount.cinBack && (
+              <div style={{ marginTop: '2rem', marginBottom: '1.5rem' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '1rem' }}>CIN - Verso</div>
+                <img src={selectedAccount.cinBack} alt="CIN Verso" style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '8px', border: '1px solid var(--border-color)' }} />
+              </div>
+            )}
+
+            {selectedAccount.status === 'pending' && (
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    handleStatusChange(selectedAccount.id, 'approved', selectedAccount.name)
+                    setSelectedAccount(null)
+                  }}
+                >
+                  ✓ Approuver
+                </button>
+                <button
+                  className="btn btn-danger"
+                  onClick={() => {
+                    handleStatusChange(selectedAccount.id, 'revoked', selectedAccount.name)
+                    setSelectedAccount(null)
+                  }}
+                >
+                  ✕ Rejeter
+                </button>
+              </div>
+            )}
           </div>
         </div>
-      </div>
+      ) : (
+        <>
+          {/* Pending Accounts */}
+          <div className="section-card">
+            <div className="section-header">
+              <h2 className="section-title">
+                <span>⏳</span>
+                Demandes en attente ({pendingAccounts.length})
+              </h2>
+            </div>
+            <div className="section-body no-padding">
+              {pendingAccounts.length > 0 ? (
+                <div className="table-container">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Nom</th>
+                        <th>Utilisateur</th>
+                        <th>Region</th>
+                        <th>Date demande</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pendingAccounts.map(account => (
+                        <tr key={account.id}>
+                          <td style={{ fontWeight: 500, cursor: 'pointer', color: 'var(--primary)' }} onClick={() => setSelectedAccount(account)}>
+                            {account.name}
+                          </td>
+                          <td>{account.username}</td>
+                          <td>{account.region}</td>
+                          <td>{new Date(account.createdAt).toLocaleDateString('fr-FR')}</td>
+                          <td>
+                            <button
+                              className="action-btn action-btn-success"
+                              onClick={() => handleStatusChange(account.id, 'approved', account.name)}
+                            >
+                              Approuver
+                            </button>
+                            <button
+                              className="action-btn action-btn-delete"
+                              onClick={() => handleStatusChange(account.id, 'revoked', account.name)}
+                            >
+                              Rejeter
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <div className="empty-state-icon">✓</div>
+                  <p>Aucune demande en attente</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* All Accounts */}
+          <div className="section-card">
+            <div className="section-header">
+              <h2 className="section-title">
+                <span>👥</span>
+                Tous les comptes ({accounts.length})
+              </h2>
+            </div>
+            <div className="section-body no-padding">
+              <div className="table-container">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Nom</th>
+                      <th>Utilisateur</th>
+                      <th>Region</th>
+                      <th>Statut</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...approvedAccounts, ...revokedAccounts].map(account => (
+                      <tr key={account.id}>
+                        <td style={{ fontWeight: 500, cursor: 'pointer', color: 'var(--primary)' }} onClick={() => setSelectedAccount(account)}>
+                          {account.name}
+                        </td>
+                        <td>{account.username}</td>
+                        <td>{account.region}</td>
+                        <td>
+                          <span className={getStatusBadge(account.status)}>
+                            {getStatusLabel(account.status)}
+                          </span>
+                        </td>
+                        <td>
+                          {account.status === 'approved' ? (
+                            <button
+                              className="action-btn action-btn-delete"
+                              onClick={() => handleStatusChange(account.id, 'revoked', account.name)}
+                            >
+                              Revoquer
+                            </button>
+                          ) : (
+                            <button
+                              className="action-btn action-btn-success"
+                              onClick={() => handleStatusChange(account.id, 'approved', account.name)}
+                            >
+                              Reactiver
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Confirmation Dialog */}
       <ConfirmDialog

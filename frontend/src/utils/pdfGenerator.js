@@ -111,3 +111,7 @@ export const generateRegionReportPDF = async (region, reports, ppnList) => {
   const filename = `Rapport_PPN_${region}_${new Date().toISOString().split('T')[0]}.pdf`;
   doc.save(filename);
 };
+
+export const generatePDF = (reports, region, month) => {
+  generateRegionReportPDF(region, reports, []);
+};

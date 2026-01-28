@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import { useData, REGIONS } from '../contexts/DataContext.jsx'
 import { BarChart, LineChart } from '../components/SimpleChart.jsx'
+import { generatePDF } from '../utils/pdfGenerator.js'
 
 function Analytics() {
   const { priceReports, ppnList } = useData()
@@ -94,10 +95,19 @@ function Analytics() {
           />
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.5rem' }}>
           <span className="filter-badge">
             {filteredReports.length} rapport(s)
           </span>
+          {selectedRegion && filteredReports.length > 0 && (
+            <button
+              className="btn btn-small btn-primary"
+              onClick={() => generatePDF(filteredReports, selectedRegion, selectedMonth)}
+              style={{ marginLeft: 'auto' }}
+            >
+              📄 Télécharger PDF
+            </button>
+          )}
         </div>
       </div>
 
