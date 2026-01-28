@@ -334,3 +334,34 @@
   color: var(--text-secondary);
   font-weight: 500;
 }
+
+/* Filter Actions */
+.filter-actions {
+  display: flex;
+  gap: var(--space-md);
+  margin-left: auto;
+}
+
+.btn-secondary {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  transition: all var(--transition-fast);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: var(--border-color);
+  border-color: var(--primary);
+}
+
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .filter-actions {
+    flex-direction: column;
+    margin-left: 0;
+  }
+}

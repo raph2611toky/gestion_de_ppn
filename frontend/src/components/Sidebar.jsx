@@ -49,6 +49,13 @@ function Sidebar({ activePage, onNavigate, user, onLogout, onThemeToggle, theme 
         <div className="sidebar-section">
           <p className="sidebar-section-title">Parametres</p>
           <button
+            className={`sidebar-nav-item ${activePage === 'profile' ? 'active' : ''}`}
+            onClick={() => onNavigate('profile')}
+          >
+            <span className="sidebar-nav-item-icon">👤</span>
+            <span>Mon profil</span>
+          </button>
+          <button
             className="sidebar-nav-item"
             onClick={onThemeToggle}
           >

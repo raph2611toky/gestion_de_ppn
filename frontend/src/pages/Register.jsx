@@ -9,22 +9,49 @@ function Register({ onBack }) {
   const [formData, setFormData] = useState({
     name: '',
     username: '',
+    cin: '',
     password: '',
     confirmPassword: '',
     region: '',
+    photo: null,
+    cinFront: null,
+    cinBack: null,
   })
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [previews, setPreviews] = useState({
+    photo: null,
+    cinFront: null,
+    cinBack: null,
+  })
   const { showNotification } = useNotification()
   const { addAccount } = useData()
+
+  const handleFileChange = (e, fieldName) => {
+    const file = e.target.files[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setFormData({ ...formData, [fieldName]: file })
+        setPreviews({ ...previews, [fieldName]: reader.result })
+      }
+      reader.readAsDataURL(file)
+    }
+  }
 
   const handleSubmit = (e) => {
     e.preventDefault()
     setError('')
     setIsLoading(true)
 
-    if (!formData.name || !formData.username || !formData.password || !formData.region) {
+    if (!formData.name || !formData.username || !formData.cin || !formData.password || !formData.region) {
       setError('Veuillez remplir tous les champs obligatoires')
+      setIsLoading(false)
+      return
+    }
+
+    if (!/^\d{12}$/.test(formData.cin)) {
+      setError('Le CIN doit contenir exactement 12 chiffres')
       setIsLoading(false)
       return
     }
@@ -45,7 +72,11 @@ function Register({ onBack }) {
       addAccount({
         name: formData.name,
         username: formData.username,
+        cin: formData.cin,
         region: formData.region,
+        photo: previews.photo,
+        cinFront: previews.cinFront,
+        cinBack: previews.cinBack,
       })
 
       showNotification('success', 'Demande envoyee ! Un administrateur validera votre compte.')
@@ -93,6 +124,21 @@ function Register({ onBack }) {
           </div>
 
           <div className="login-input-group">
+            <label className="login-label">CIN (12 chiffres) *</label>
+            <input
+              type="text"
+              className="login-input no-icon"
+              placeholder="Ex: 123456789012"
+              value={formData.cin}
+              onChange={(e) => {
+                const value = e.target.value.replace(/\D/g, '').slice(0, 12)
+                setFormData({ ...formData, cin: value })
+              }}
+              maxLength="12"
+            />
+          </div>
+
+          <div className="login-input-group">
             <label className="login-label">Region *</label>
             <select
               className="login-select"
@@ -126,6 +172,65 @@ function Register({ onBack }) {
               value={formData.confirmPassword}
               onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
             />
+          </div>
+
+          <div className="register-documents">
+            <div className="document-upload">
+              <label className="upload-label">Photo de profil</label>
+              <label className="upload-input">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleFileChange(e, 'photo')}
+                />
+                <span className="upload-placeholder">
+                  {previews.photo ? 'Photo selectionnee' : 'Cliquez pour ajouter'}
+                </span>
+              </label>
+              {previews.photo && (
+                <div className="upload-preview">
+                  <img src={previews.photo} alt="Preview" />
+                </div>
+              )}
+            </div>
+
+            <div className="document-upload">
+              <label className="upload-label">CIN - Recto</label>
+              <label className="upload-input">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleFileChange(e, 'cinFront')}
+                />
+                <span className="upload-placeholder">
+                  {previews.cinFront ? 'CIN Recto selectionnee' : 'Cliquez pour ajouter'}
+                </span>
+              </label>
+              {previews.cinFront && (
+                <div className="upload-preview">
+                  <img src={previews.cinFront} alt="Preview" />
+                </div>
+              )}
+            </div>
+
+            <div className="document-upload">
+              <label className="upload-label">CIN - Verso</label>
+              <label className="upload-input">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleFileChange(e, 'cinBack')}
+                />
+                <span className="upload-placeholder">
+                  {previews.cinBack ? 'CIN Verso selectionnee' : 'Cliquez pour ajouter'}
+                </span>
+              </label>
+              {previews.cinBack && (
+                <div className="upload-preview">
+                  <img src={previews.cinBack} alt="Preview" />
+                </div>
+              )}
+            </div>
           </div>
 
           <button type="submit" className="login-submit" disabled={isLoading}>

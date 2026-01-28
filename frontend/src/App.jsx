@@ -17,6 +17,7 @@ import PPNManagement from './pages/PPNManagement.jsx'
 import Analytics from './pages/Analytics.jsx'
 import RegionalReports from './pages/RegionalReports.jsx'
 import AddReport from './pages/AddReport.jsx'
+import Profile from './pages/Profile.jsx'
 import './styles/app.css'
 
 function AppContent() {
@@ -65,6 +66,7 @@ function AppContent() {
       case 'analytics': return 'Analytiques'
       case 'regional-reports': return 'Rapports de prix'
       case 'add-report': return 'Nouveau rapport'
+      case 'profile': return 'Mon profil'
       default: return 'PPN Manager'
     }
   }
@@ -85,8 +87,10 @@ function AppContent() {
         return <RegionalReports onNavigate={setActivePage} />
       case 'add-report':
         return <AddReport onNavigate={setActivePage} />
+      case 'profile':
+        return <Profile onNavigate={setActivePage} />
       default:
-        return user.role === 'admin' 
+        return user.role === 'admin'
           ? <AdminDashboard onNavigate={setActivePage} />
           : <RegionalDashboard onNavigate={setActivePage} />
     }

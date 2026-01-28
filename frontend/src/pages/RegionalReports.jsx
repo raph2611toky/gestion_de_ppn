@@ -3,12 +3,16 @@
 import React, { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useData } from '../contexts/DataContext.jsx'
+import { useNotification } from '../components/Notifications.jsx'
+import { generateRegionReportPDF } from '../utils/pdfGenerator.js'
 
 function RegionalReports({ onNavigate }) {
   const { user } = useAuth()
   const { priceReports, ppnList } = useData()
+  const { showNotification } = useNotification()
   const [filterPPN, setFilterPPN] = useState('')
   const [filterMonth, setFilterMonth] = useState('')
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
 
   const myReports = priceReports.filter(r => r.region === user?.region)
 
@@ -46,7 +50,23 @@ function RegionalReports({ onNavigate }) {
           />
         </div>
 
-        <div style={{ marginLeft: 'auto' }}>
+        <div className="filter-actions">
+          <button
+            className="btn btn-secondary"
+            onClick={async () => {
+              setIsGeneratingPDF(true)
+              try {
+                await generateRegionReportPDF(user?.region, filteredReports, ppnList)
+                showNotification('success', 'PDF genere avec succes')
+              } catch (error) {
+                showNotification('error', 'Erreur lors de la generation du PDF')
+              }
+              setIsGeneratingPDF(false)
+            }}
+            disabled={isGeneratingPDF || filteredReports.length === 0}
+          >
+            {isGeneratingPDF ? 'Generation...' : 'Telecharger PDF'}
+          </button>
           <button
             className="btn btn-primary"
             onClick={() => onNavigate('add-report')}
@@ -67,28 +87,34 @@ function RegionalReports({ onNavigate }) {
         <div className="section-body no-padding">
           {filteredReports.length > 0 ? (
             <div className="table-container">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Produit</th>
-                    <th>Prix</th>
-                    <th>District</th>
-                    <th>Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredReports.map(report => (
-                    <tr key={report.id}>
-                      <td style={{ fontWeight: 500 }}>{report.ppnName}</td>
-                      <td style={{ fontWeight: 600, color: 'var(--primary)' }}>
-                        {report.price.toLocaleString()} Ar
-                      </td>
-                      <td>{report.district}</td>
-                      <td>{new Date(report.date).toLocaleDateString('fr-FR')}</td>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Produit</th>
+                      <th>Prix Unit. Min</th>
+                      <th>Prix Unit. Max</th>
+                      <th>Prix Gros Min</th>
+                      <th>Prix Gros Max</th>
+                      <th>District</th>
+                      <th>Date</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {filteredReports.map(report => (
+                      <tr key={report.id}>
+                        <td style={{ fontWeight: 500 }}>{report.ppnName}</td>
+                        <td>{report.prix_unitaire_min?.toLocaleString('fr-FR') || '0'} Ar</td>
+                        <td>{report.prix_unitaire_max?.toLocaleString('fr-FR') || '0'} Ar</td>
+                        <td>{report.prix_gros_min?.toLocaleString('fr-FR') || '0'} Ar</td>
+                        <td>{report.prix_gros_max?.toLocaleString('fr-FR') || '0'} Ar</td>
+                        <td>{report.district}</td>
+                        <td>{new Date(report.date).toLocaleDateString('fr-FR')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           ) : (
             <div className="empty-state">
