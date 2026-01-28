@@ -276,3 +276,7 @@
   opacity: 0.7;
   cursor: not-allowed;
 }
+
+.login-header-simple{
+  text-align: center;
+}
