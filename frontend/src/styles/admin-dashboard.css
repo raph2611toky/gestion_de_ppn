@@ -1,0 +1,135 @@
+.admin-dashboard-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+}
+
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+.admin-content-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: var(--spacing-xl);
+}
+
+.admin-section {
+  background: var(--color-bg);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--color-border);
+}
+
+.admin-section h2 {
+  margin-bottom: var(--spacing-lg);
+  color: var(--color-text);
+}
+
+.reports-table {
+  width: 100%;
+  font-size: 13px;
+}
+
+.reports-table thead {
+  background-color: var(--color-bg-alt);
+}
+
+.reports-table th {
+  padding: 10px var(--spacing-md);
+  text-align: left;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid var(--color-border);
+}
+
+.reports-table td {
+  padding: 10px var(--spacing-md);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.reports-table tbody tr:hover {
+  background-color: var(--color-bg-alt);
+}
+
+.region-stats-table {
+  width: 100%;
+  font-size: 13px;
+}
+
+.region-stats-table th {
+  padding: 10px var(--spacing-md);
+  text-align: left;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background-color: var(--color-bg-alt);
+  border-bottom: 2px solid var(--color-border);
+}
+
+.region-stats-table td {
+  padding: 10px var(--spacing-md);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.region-stats-table tbody tr:hover {
+  background-color: var(--color-bg-alt);
+}
+
+.badge-primary {
+  display: inline-block;
+  background-color: var(--color-primary);
+  color: white;
+  padding: 4px 8px;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.empty-state {
+  padding: var(--spacing-xl);
+  text-align: center;
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+@media (max-width: 768px) {
+  .admin-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .admin-content-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .reports-table th,
+  .reports-table td {
+    padding: 8px var(--spacing-sm);
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stat-number {
+    font-size: 24px;
+  }
+
+  .reports-table {
+    font-size: 11px;
+  }
+
+  .reports-table th,
+  .reports-table td {
+    padding: 6px var(--spacing-xs);
+  }
+}
