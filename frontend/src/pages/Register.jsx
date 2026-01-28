@@ -14,45 +14,52 @@ function Register({ onBack }) {
     region: '',
   })
   const [error, setError] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
   const { showNotification } = useNotification()
   const { addAccount } = useData()
 
   const handleSubmit = (e) => {
     e.preventDefault()
     setError('')
+    setIsLoading(true)
 
     if (!formData.name || !formData.username || !formData.password || !formData.region) {
       setError('Veuillez remplir tous les champs obligatoires')
+      setIsLoading(false)
       return
     }
 
     if (formData.password !== formData.confirmPassword) {
       setError('Les mots de passe ne correspondent pas')
+      setIsLoading(false)
       return
     }
 
     if (formData.password.length < 6) {
       setError('Le mot de passe doit contenir au moins 6 caracteres')
+      setIsLoading(false)
       return
     }
 
-    addAccount({
-      name: formData.name,
-      username: formData.username,
-      region: formData.region,
-    })
+    setTimeout(() => {
+      addAccount({
+        name: formData.name,
+        username: formData.username,
+        region: formData.region,
+      })
 
-    showNotification('success', 'Demande envoyee ! Un administrateur validera votre compte.')
-    onBack()
+      showNotification('success', 'Demande envoyee ! Un administrateur validera votre compte.')
+      setIsLoading(false)
+      onBack()
+    }, 500)
   }
 
   return (
     <div className="login-container">
       <div className="login-card register">
-        <div className="login-header">
-          <div className="login-logo">📝</div>
-          <h1 className="login-title">Demande d'acces</h1>
-          <p className="login-subtitle">Creez votre compte pour acceder au systeme</p>
+        <div className="login-header-simple">
+          <h1 className="login-title-simple">PPN Manager</h1>
+          <p className="login-subtitle-simple">Demande d'acces</p>
         </div>
 
         <form className="login-form" onSubmit={handleSubmit}>
@@ -121,8 +128,15 @@ function Register({ onBack }) {
             />
           </div>
 
-          <button type="submit" className="login-submit">
-            Envoyer la demande
+          <button type="submit" className="login-submit" disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <span className="spinner"></span>
+                Envoi en cours...
+              </>
+            ) : (
+              'Envoyer la demande'
+            )}
           </button>
         </form>
 

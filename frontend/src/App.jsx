@@ -9,6 +9,7 @@ import Sidebar from './components/Sidebar.jsx'
 import Header from './components/Header.jsx'
 import Login from './pages/Login.jsx'
 import Register from './pages/Register.jsx'
+import EmailOTP from './pages/EmailOTP.jsx'
 import AdminDashboard from './pages/AdminDashboard.jsx'
 import RegionalDashboard from './pages/RegionalDashboard.jsx'
 import AccountValidation from './pages/AccountValidation.jsx'
@@ -23,6 +24,8 @@ function AppContent() {
   const { theme, toggleTheme } = useTheme()
   const [activePage, setActivePage] = useState('')
   const [showRegister, setShowRegister] = useState(false)
+  const [showOTP, setShowOTP] = useState(false)
+  const [otpEmail, setOtpEmail] = useState('')
 
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -33,6 +36,18 @@ function AppContent() {
   }, [isAuthenticated, user, activePage])
 
   if (!isAuthenticated) {
+    if (showOTP) {
+      return (
+        <EmailOTP
+          email={otpEmail}
+          onVerify={(code) => {
+            console.log('OTP verified:', code)
+            setShowOTP(false)
+          }}
+          onBack={() => setShowOTP(false)}
+        />
+      )
+    }
     if (showRegister) {
       return <Register onBack={() => setShowRegister(false)} />
     }

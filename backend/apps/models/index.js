@@ -1,22 +1,11 @@
 const dbConfig = require("../../config/db_config.js").development;
 const { Sequelize, DataTypes } = require("sequelize");
 
-const sequelize = new Sequelize(
-  dbConfig.database,
-  dbConfig.username,
-  dbConfig.password,
-  {
-    host: dbConfig.host,
-    dialect: dbConfig.dialect,
-    logging: dbConfig.logging,
-    pool: {
-      max: dbConfig.pool.max,
-      min: dbConfig.pool.min,
-      acquire: dbConfig.pool.acquire,
-      idle: dbConfig.pool.idle,
-    },
-  }
-);
+const sequelize = new Sequelize({
+  dialect: 'sqlite',
+  storage: dbConfig.storage,
+  logging: dbConfig.logging
+});
 
 sequelize
   .authenticate()
