@@ -11,7 +11,7 @@ function PPNManagement() {
   const [showEditModal, setShowEditModal] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [selectedPPN, setSelectedPPN] = useState(null)
-  const [formData, setFormData] = useState({ name: '', unit: '', category: '' })
+  const [formData, setFormData] = useState({ name: '', unit: '', category: '', district: '' })
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
@@ -31,18 +31,18 @@ function PPNManagement() {
   const paginatedPPNList = filteredPPNList.slice(startIndex, endIndex)
 
   const handleAdd = () => {
-    if (!formData.name || !formData.unit || !formData.category) {
+    if (!formData.name || !formData.unit || !formData.category || !formData.district) {
       showNotification('error', 'Veuillez remplir tous les champs')
       return
     }
     addPPN(formData)
     showNotification('success', 'Produit PPN ajoute avec succes')
     setShowAddModal(false)
-    setFormData({ name: '', unit: '', category: '' })
+    setFormData({ name: '', unit: '', category: '', district: '' })
   }
 
   const handleEdit = () => {
-    if (!selectedPPN || !formData.name || !formData.unit || !formData.category) {
+    if (!selectedPPN || !formData.name || !formData.unit || !formData.category || !formData.district) {
       showNotification('error', 'Veuillez remplir tous les champs')
       return
     }
@@ -50,7 +50,7 @@ function PPNManagement() {
     showNotification('success', 'Produit PPN modifie avec succes')
     setShowEditModal(false)
     setSelectedPPN(null)
-    setFormData({ name: '', unit: '', category: '' })
+    setFormData({ name: '', unit: '', category: '', district: '' })
   }
 
   const handleDelete = () => {
@@ -62,7 +62,7 @@ function PPNManagement() {
 
   const openEditModal = (ppn) => {
     setSelectedPPN(ppn)
-    setFormData({ name: ppn.name, unit: ppn.unit, category: ppn.category })
+    setFormData({ name: ppn.name, unit: ppn.unit, category: ppn.category, district: ppn.district || '' })
     setShowEditModal(true)
   }
 
@@ -108,6 +108,16 @@ function PPNManagement() {
             <option key={cat} value={cat}>{cat}</option>
           ))}
         </select>
+      </div>
+      <div className="form-group" style={{ marginBottom: 0 }}>
+        <label className="form-label">District *</label>
+        <input
+          type="text"
+          className="form-input"
+          placeholder="Ex: Antananarivo"
+          value={formData.district}
+          onChange={(e) => setFormData({ ...formData, district: e.target.value })}
+        />
       </div>
     </div>
   )

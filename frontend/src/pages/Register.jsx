@@ -9,6 +9,7 @@ function Register({ onBack }) {
   const [formData, setFormData] = useState({
     name: '',
     username: '',
+    cin: '',
     password: '',
     confirmPassword: '',
     region: '',
@@ -23,8 +24,14 @@ function Register({ onBack }) {
     setError('')
     setIsLoading(true)
 
-    if (!formData.name || !formData.username || !formData.password || !formData.region) {
+    if (!formData.name || !formData.username || !formData.cin || !formData.password || !formData.region) {
       setError('Veuillez remplir tous les champs obligatoires')
+      setIsLoading(false)
+      return
+    }
+
+    if (!/^\d{12}$/.test(formData.cin)) {
+      setError('Le CIN doit contenir exactement 12 chiffres')
       setIsLoading(false)
       return
     }
@@ -45,6 +52,7 @@ function Register({ onBack }) {
       addAccount({
         name: formData.name,
         username: formData.username,
+        cin: formData.cin,
         region: formData.region,
       })
 
@@ -89,6 +97,21 @@ function Register({ onBack }) {
               placeholder="Choisissez un nom d'utilisateur"
               value={formData.username}
               onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+            />
+          </div>
+
+          <div className="login-input-group">
+            <label className="login-label">CIN (12 chiffres) *</label>
+            <input
+              type="text"
+              className="login-input no-icon"
+              placeholder="Ex: 123456789012"
+              value={formData.cin}
+              onChange={(e) => {
+                const value = e.target.value.replace(/\D/g, '').slice(0, 12)
+                setFormData({ ...formData, cin: value })
+              }}
+              maxLength="12"
             />
           </div>
 
