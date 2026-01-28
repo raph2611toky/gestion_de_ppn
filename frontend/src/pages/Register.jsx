@@ -6,10 +6,12 @@ import { useNotification } from '../components/Notifications.jsx'
 import '../styles/login.css'
 
 function Register({ onBack }) {
+  const [step, setStep] = useState(1)
   const [formData, setFormData] = useState({
     name: '',
     username: '',
     cin: '',
+    email: '',
     password: '',
     confirmPassword: '',
     region: '',
@@ -39,19 +41,46 @@ function Register({ onBack }) {
     }
   }
 
-  const handleSubmit = (e) => {
+  const handleNextStep = (e) => {
     e.preventDefault()
     setError('')
-    setIsLoading(true)
 
-    if (!formData.name || !formData.username || !formData.cin || !formData.password || !formData.region) {
-      setError('Veuillez remplir tous les champs obligatoires')
-      setIsLoading(false)
+    if (!formData.name || !formData.cin) {
+      setError('Veuillez remplir tous les champs')
       return
     }
 
     if (!/^\d{12}$/.test(formData.cin)) {
       setError('Le CIN doit contenir exactement 12 chiffres')
+      return
+    }
+
+    if (!previews.cinFront || !previews.cinBack) {
+      setError('Veuillez ajouter les deux faces de votre CIN')
+      return
+    }
+
+    setStep(2)
+  }
+
+  const handlePreviousStep = () => {
+    setError('')
+    setStep(1)
+  }
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    setError('')
+    setIsLoading(true)
+
+    if (!formData.username || !formData.email || !formData.password || !formData.region) {
+      setError('Veuillez remplir tous les champs obligatoires')
+      setIsLoading(false)
+      return
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      setError('Veuillez entrer une adresse email valide')
       setIsLoading(false)
       return
     }
@@ -74,6 +103,7 @@ function Register({ onBack }) {
         username: formData.username,
         cin: formData.cin,
         region: formData.region,
+        email: formData.email,
         photo: previews.photo,
         cinFront: previews.cinFront,
         cinBack: previews.cinBack,
@@ -90,160 +120,205 @@ function Register({ onBack }) {
       <div className="login-card register">
         <div className="login-header-simple">
           <h1 className="login-title-simple">PPN Manager</h1>
-          <p className="login-subtitle-simple">Demande d'acces</p>
+          <p className="login-subtitle-simple">Demande d'acces - Etape {step}/2</p>
         </div>
 
-        <form className="login-form" onSubmit={handleSubmit}>
-          {error && (
-            <div className="login-error">
-              <span>⚠️</span>
-              <span>{error}</span>
-            </div>
-          )}
-
-          <div className="login-input-group">
-            <label className="login-label">Nom complet *</label>
-            <input
-              type="text"
-              className="login-input no-icon"
-              placeholder="Votre nom complet"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            />
-          </div>
-
-          <div className="login-input-group">
-            <label className="login-label">Nom d'utilisateur *</label>
-            <input
-              type="text"
-              className="login-input no-icon"
-              placeholder="Choisissez un nom d'utilisateur"
-              value={formData.username}
-              onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-            />
-          </div>
-
-          <div className="login-input-group">
-            <label className="login-label">CIN (12 chiffres) *</label>
-            <input
-              type="text"
-              className="login-input no-icon"
-              placeholder="Ex: 123456789012"
-              value={formData.cin}
-              onChange={(e) => {
-                const value = e.target.value.replace(/\D/g, '').slice(0, 12)
-                setFormData({ ...formData, cin: value })
-              }}
-              maxLength="12"
-            />
-          </div>
-
-          <div className="login-input-group">
-            <label className="login-label">Region *</label>
-            <select
-              className="login-select"
-              value={formData.region}
-              onChange={(e) => setFormData({ ...formData, region: e.target.value })}
-            >
-              <option value="">Selectionner une region</option>
-              {REGIONS.map(region => (
-                <option key={region} value={region}>{region}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="login-input-group">
-            <label className="login-label">Mot de passe *</label>
-            <input
-              type="password"
-              className="login-input no-icon"
-              placeholder="Minimum 6 caracteres"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-            />
-          </div>
-
-          <div className="login-input-group">
-            <label className="login-label">Confirmer le mot de passe *</label>
-            <input
-              type="password"
-              className="login-input no-icon"
-              placeholder="Confirmez votre mot de passe"
-              value={formData.confirmPassword}
-              onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-            />
-          </div>
-
-          <div className="register-documents">
-            <div className="document-upload">
-              <label className="upload-label">Photo de profil</label>
-              <label className="upload-input">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handleFileChange(e, 'photo')}
-                />
-                <span className="upload-placeholder">
-                  {previews.photo ? 'Photo selectionnee' : 'Cliquez pour ajouter'}
-                </span>
-              </label>
-              {previews.photo && (
-                <div className="upload-preview">
-                  <img src={previews.photo} alt="Preview" />
-                </div>
-              )}
-            </div>
-
-            <div className="document-upload">
-              <label className="upload-label">CIN - Recto</label>
-              <label className="upload-input">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handleFileChange(e, 'cinFront')}
-                />
-                <span className="upload-placeholder">
-                  {previews.cinFront ? 'CIN Recto selectionnee' : 'Cliquez pour ajouter'}
-                </span>
-              </label>
-              {previews.cinFront && (
-                <div className="upload-preview">
-                  <img src={previews.cinFront} alt="Preview" />
-                </div>
-              )}
-            </div>
-
-            <div className="document-upload">
-              <label className="upload-label">CIN - Verso</label>
-              <label className="upload-input">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handleFileChange(e, 'cinBack')}
-                />
-                <span className="upload-placeholder">
-                  {previews.cinBack ? 'CIN Verso selectionnee' : 'Cliquez pour ajouter'}
-                </span>
-              </label>
-              {previews.cinBack && (
-                <div className="upload-preview">
-                  <img src={previews.cinBack} alt="Preview" />
-                </div>
-              )}
-            </div>
-          </div>
-
-          <button type="submit" className="login-submit" disabled={isLoading}>
-            {isLoading ? (
-              <>
-                <span className="spinner"></span>
-                Envoi en cours...
-              </>
-            ) : (
-              'Envoyer la demande'
+        {step === 1 ? (
+          <form className="login-form" onSubmit={handleNextStep}>
+            {error && (
+              <div className="login-error">
+                <span>!</span>
+                <span>{error}</span>
+              </div>
             )}
-          </button>
-        </form>
+
+            <div className="form-section-title">Informations personnelles</div>
+
+            <div className="login-input-group">
+              <label className="login-label">Nom complet *</label>
+              <input
+                type="text"
+                className="login-input no-icon"
+                placeholder="Votre nom complet"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              />
+            </div>
+
+            <div className="login-input-group">
+              <label className="login-label">CIN (12 chiffres) *</label>
+              <input
+                type="text"
+                className="login-input no-icon"
+                placeholder="Ex: 123456789012"
+                value={formData.cin}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, '').slice(0, 12)
+                  setFormData({ ...formData, cin: value })
+                }}
+                maxLength="12"
+              />
+            </div>
+
+            <div className="form-section-title">Pieces d'identite</div>
+
+            <div className="register-documents">
+              <div className="document-upload">
+                <label className="upload-label">CIN - Recto *</label>
+                <label className="upload-input">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleFileChange(e, 'cinFront')}
+                  />
+                  <span className="upload-placeholder">
+                    {previews.cinFront ? 'CIN Recto selectionnee' : 'Cliquez pour ajouter'}
+                  </span>
+                </label>
+                {previews.cinFront && (
+                  <div className="upload-preview">
+                    <img src={previews.cinFront} alt="Preview" />
+                  </div>
+                )}
+              </div>
+
+              <div className="document-upload">
+                <label className="upload-label">CIN - Verso *</label>
+                <label className="upload-input">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleFileChange(e, 'cinBack')}
+                  />
+                  <span className="upload-placeholder">
+                    {previews.cinBack ? 'CIN Verso selectionnee' : 'Cliquez pour ajouter'}
+                  </span>
+                </label>
+                {previews.cinBack && (
+                  <div className="upload-preview">
+                    <img src={previews.cinBack} alt="Preview" />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <button type="submit" className="login-submit">
+              Continuer
+            </button>
+          </form>
+        ) : (
+          <form className="login-form" onSubmit={handleSubmit}>
+            {error && (
+              <div className="login-error">
+                <span>!</span>
+                <span>{error}</span>
+              </div>
+            )}
+
+            <div className="form-section-title">Photo de profil</div>
+
+            <div className="register-documents">
+              <div className="document-upload">
+                <label className="upload-label">Photo de profil</label>
+                <label className="upload-input">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleFileChange(e, 'photo')}
+                  />
+                  <span className="upload-placeholder">
+                    {previews.photo ? 'Photo selectionnee' : 'Cliquez pour ajouter'}
+                  </span>
+                </label>
+                {previews.photo && (
+                  <div className="upload-preview">
+                    <img src={previews.photo} alt="Preview" />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="form-section-title">Infos de connexion</div>
+
+            <div className="login-input-group">
+              <label className="login-label">Nom d'utilisateur *</label>
+              <input
+                type="text"
+                className="login-input no-icon"
+                placeholder="Choisissez un nom d'utilisateur"
+                value={formData.username}
+                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+              />
+            </div>
+
+            <div className="login-input-group">
+              <label className="login-label">Email *</label>
+              <input
+                type="email"
+                className="login-input no-icon"
+                placeholder="votre.email@exemple.com"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              />
+            </div>
+
+            <div className="login-input-group">
+              <label className="login-label">Mot de passe *</label>
+              <input
+                type="password"
+                className="login-input no-icon"
+                placeholder="Minimum 6 caracteres"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              />
+            </div>
+
+            <div className="login-input-group">
+              <label className="login-label">Confirmer le mot de passe *</label>
+              <input
+                type="password"
+                className="login-input no-icon"
+                placeholder="Confirmez votre mot de passe"
+                value={formData.confirmPassword}
+                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+              />
+            </div>
+
+            <div className="login-input-group">
+              <label className="login-label">Region *</label>
+              <select
+                className="login-select"
+                value={formData.region}
+                onChange={(e) => setFormData({ ...formData, region: e.target.value })}
+              >
+                <option value="">Selectionner une region</option>
+                {REGIONS.map(region => (
+                  <option key={region} value={region}>{region}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-actions-register">
+              <button
+                type="button"
+                className="login-submit-secondary"
+                onClick={handlePreviousStep}
+              >
+                Retour
+              </button>
+              <button type="submit" className="login-submit" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <span className="spinner"></span>
+                    Envoi en cours...
+                  </>
+                ) : (
+                  'Envoyer la demande'
+                )}
+              </button>
+            </div>
+          </form>
+        )}
 
         <div className="login-footer">
           <p className="login-footer-text">
