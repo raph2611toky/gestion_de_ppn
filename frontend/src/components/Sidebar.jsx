@@ -6,7 +6,7 @@ import '../styles/sidebar.css'
 function Sidebar({ activePage, onNavigate, user, onLogout, onThemeToggle, theme }) {
   const adminNavItems = [
     { id: 'admin-dashboard', label: 'Tableau de bord', icon: '📊' },
-    { id: 'account-validation', label: 'Validation comptes', icon: '👥' },
+    { id: 'account-validation', label: 'Validation modérateurs', icon: '👥' },
     { id: 'ppn-management', label: 'Gestion PPN', icon: '📦' },
     { id: 'analytics', label: 'Analytiques', icon: '📈' },
   ]
@@ -17,7 +17,7 @@ function Sidebar({ activePage, onNavigate, user, onLogout, onThemeToggle, theme 
     { id: 'add-report', label: 'Nouveau rapport', icon: '➕' },
   ]
 
-  const navItems = user.role === 'admin' ? adminNavItems : regionalNavItems
+  const navItems = user.fonction === 'ADMINISTRATEUR' ? adminNavItems : regionalNavItems
 
   return (
     <aside className="sidebar">
@@ -68,11 +68,11 @@ function Sidebar({ activePage, onNavigate, user, onLogout, onThemeToggle, theme 
       <div className="sidebar-footer">
         <div className="sidebar-user">
           <div className="sidebar-user-avatar">
-            {user.name.charAt(0).toUpperCase()}
+            {user.nom.charAt(0).toUpperCase()}
           </div>
           <div className="sidebar-user-info">
-            <p className="sidebar-user-name">{user.name}</p>
-            <p className="sidebar-user-role">{user.role === 'admin' ? 'Administrateur' : user.region}</p>
+            <p className="sidebar-user-name">{user.nom}</p>
+            <p className="sidebar-user-role">{user.fonction === 'ADMINISTRATEUR' ? 'Administrateur' : user.moderateurDetails?.region}</p>
           </div>
         </div>
         <button className="sidebar-logout-btn" onClick={onLogout}>

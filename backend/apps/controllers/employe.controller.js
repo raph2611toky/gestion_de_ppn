@@ -84,28 +84,56 @@ const addEmploye = async (req, res) => {
 // :::: 2 - get all Employe :::: //
 const getAllEmploye = async (req, res) => {
     try {
+        const includeModerateur = req.query.withModerateur === 'true';
+
+        let employes;
+
         if (req.query.nom) {
             const name = req.query.nom;
-            const { count, rows } = await Employe.findAndCountAll({
+            employes = await Employe.findAndCountAll({
                 where: {
-                    nom: {
-                        [Op.like]: `%${name}%`,
-                    },
+                    nom: { [Op.like]: `%${name}%` },
                 },
-                order: ["cin"],
+                include: includeModerateur ? [{
+                    model: Moderateur,
+                    as: 'moderateurDetails',
+                    attributes: ['region', 'is_verified', 'is_validated']
+                }] : [],
+                order: [["cin"]],
                 limit: 50,
             });
-            const message = `Il y a ${count} Employes qui correspondent au terme de recherche ${name}.`;
-            console.log(message);
-            return Helper.send_res(res, rows);
         } else {
-            const employes = await Employe.findAll({ order: ["nom"] });
-            return Helper.send_res(res, employes);
+            employes = await Employe.findAll({
+                include: includeModerateur ? [{
+                    model: Moderateur,
+                    as: 'moderateurDetails',
+                    attributes: ['region', 'is_verified', 'is_validated']
+                }] : [],
+                order: [["nom"]],
+            });
         }
+
+        // Optionnel : transformer les chemins en URLs absolues
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        employes.rows = employes.rows.map(emp => {
+            const e = emp.toJSON();
+            if (e.photo) e.photo = `${baseUrl}/${e.photo}`;
+            if (e.moderateurDetails) {
+                if (e.moderateurDetails.piece_identite_face) {
+                    e.moderateurDetails.piece_identite_face = `${baseUrl}/${e.moderateurDetails.piece_identite_face}`;
+                }
+                if (e.moderateurDetails.piece_identite_recto) {
+                    e.moderateurDetails.piece_identite_recto = `${baseUrl}/${e.moderateurDetails.piece_identite_recto}`;
+                }
+            }
+            return e;
+        });
+
+        return Helper.send_res(res, employes);
+
     } catch (err) {
         console.error(err);
-        const message = `Impossible de récupérer la liste des Employes ! Réessayez dans quelques instants.`;
-        return Helper.send_res(res, { erreur: message }, 400);
+        return Helper.send_res(res, { erreur: "Impossible de récupérer la liste des employés" }, 500);
     }
 };
 
@@ -136,17 +164,54 @@ const getOneEmploye = async (req, res) => {
 // :::: 3 - get one Employe :::: //
 const getProfileEmploye = async (req, res) => {
     try {
-        
-        const employe = req.employe;
+        const employe_id = req.employe.id_employe;
+
+        const employe = await Employe.findByPk(employe_id, {
+            attributes: [
+                'id_employe', 'cin', 'nom', 'email', 'photo', 
+                'fonction', 'is_active', 'createdAt', 'updatedAt'
+            ],
+            include: [
+                {
+                    model: Moderateur,
+                    as: 'moderateurDetails',
+                    attributes: [
+                        'region', 'piece_identite_face', 'piece_identite_recto',
+                        'is_verified', 'is_validated'
+                    ],
+                    required: false  
+                }
+            ]
+        });
+
         if (!employe) {
-            const message = `Impossible de récupérer cet Employe, essayez avec une autre identification.`;
-            return Helper.send_res(res, { erreur: message }, 404);
+            return Helper.send_res(res, { message: "Profil non trouvé" }, 404);
         }
-        return Helper.send_res(res, employe);
+
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        
+        const profile = {
+            ...employe.toJSON(),
+            photo: employe.photo ? `${baseUrl}/${employe.photo}` : null,
+        };
+
+        if (employe.fonction === 'MODERATEUR' && employe.moderateurDetails) {
+            profile.moderateurDetails = {
+                ...employe.moderateurDetails.toJSON(),
+                piece_identite_face: employe.moderateurDetails.piece_identite_face
+                    ? `${baseUrl}/${employe.moderateurDetails.piece_identite_face}`
+                    : null,
+                piece_identite_recto: employe.moderateurDetails.piece_identite_recto
+                    ? `${baseUrl}/${employe.moderateurDetails.piece_identite_recto}`
+                    : null,
+            };
+        }
+
+        return Helper.send_res(res, profile);
+
     } catch (err) {
         console.error(err);
-        const message = `Impossible de récupérer cet Employe ! Réessayez dans quelques instants.`;
-        return Helper.send_res(res, { erreur: message }, 500);
+        return Helper.send_res(res, { erreur: "Impossible de récupérer le profil" }, 500);
     }
 };
 
@@ -223,8 +288,18 @@ const getPendingModerators = async (req, res) => {
     try {
         const pending = await Employe.findAll({
             where: {
-                fonction: 'MODERATEUR',
-                is_active: false
+                fonction: 'MODERATEUR'
+            },
+            include: [{
+                model: Moderateur,
+                as: 'moderateurDetails',
+                where: { is_validated: false },
+                required: true
+            }]
+        });
+        const validated = await Employe.findAll({
+            where: {
+                fonction: 'MODERATEUR'
             },
             include: [{
                 model: Moderateur,
@@ -234,7 +309,7 @@ const getPendingModerators = async (req, res) => {
             }]
         });
 
-        return Helper.send_res(res, pending);
+        return Helper.send_res(res, {pending, validated});
     } catch (err) {
         console.error(err);
         return Helper.send_res(res, { erreur: "Erreur récupération liste" }, 500);
@@ -293,6 +368,37 @@ const validateModerator = async (req, res) => {
     } catch (err) {
         console.error(err);
         return Helper.send_res(res, { erreur: "Erreur lors de la validation" }, 500);
+    }
+};
+
+
+const rejectModerator = async (req, res) => {
+    try {
+        const id = req.params.id;
+
+        const employe = await Employe.findByPk(id);
+        if (!employe || employe.fonction !== 'MODERATEUR' || employe.is_active) {
+            return Helper.send_res(res, { erreur: "Modérateur non trouvé ou déjà actif" }, 404);
+        }
+
+        const moderateur = await Moderateur.findOne({ where: { employe_id: id } });
+        if (!moderateur || !moderateur.is_verified) {
+            return Helper.send_res(res, { erreur: "Modérateur non vérifié ou non trouvé" }, 400);
+        }
+
+        // Rejeter
+        await moderateur.update({ is_validated: false });
+
+        const emailSent = await sendValidationEmail(employe.email, employe.nom);
+        if (!emailSent) {
+            console.warn("Échec envoi email validation");
+        }
+
+        return Helper.send_res(res, { message: "Modérateur rejeté avec succès" }, 200);
+
+    } catch (err) {
+        console.error(err);
+        return Helper.send_res(res, { erreur: "Erreur lors du rejet" }, 500);
     }
 };
 
@@ -381,6 +487,20 @@ const login = async (req, res) => {
     }
 };
 
+const logout = async (req, res) => {
+    try {
+        const employe = req.employe;
+        if (!employe) {
+            return Helper.send_res(res, { erreur: "Utilisateur non authentifié" }, 401);
+        }
+        await employe.update({ is_active: false });
+        return Helper.send_res(res, { message: "Déconnexion réussie" }, 200);
+    } catch (err) {
+        console.error(err);
+        return Helper.send_res(res, { erreur: "Erreur lors de la déconnexion" }, 500);
+    }
+};
+
 module.exports = {
     addEmploye,
     getAllEmploye,
@@ -392,5 +512,6 @@ module.exports = {
     verifyOtp,
     getPendingModerators,
     getPendingModeratorDetails,
-    validateModerator,
+    validateModerator,rejectModerator,
+    logout,
 };

@@ -1,3 +1,4 @@
+// seeders/rapport.js
 const { faker } = require('@faker-js/faker');
 const moment = require('moment');
 
@@ -9,43 +10,58 @@ function getRandomInt(min, max) {
 
 module.exports = {
   async up(queryInterface, Sequelize) {
+    // Récupérer les modérateurs + leur région via jointure
     const moderators = await queryInterface.sequelize.query(
-      `SELECT id_employe, region FROM Employes WHERE fonction = 'MODERATEUR'`,
+      `
+      SELECT 
+        e.id_employe, 
+        m.region
+      FROM Employes e
+      INNER JOIN moderateurs m ON e.id_employe = m.employe_id
+      WHERE e.fonction = 'MODERATEUR'
+      `,
       { type: queryInterface.sequelize.QueryTypes.SELECT }
     );
 
+    // Récupérer les PPNs
     const ppns = await queryInterface.sequelize.query(
       `SELECT id_ppn FROM Ppns`,
       { type: queryInterface.sequelize.QueryTypes.SELECT }
     );
 
-    if (!moderators.length || !ppns.length) {
-      throw new Error('Moderators or PPNs not found');
+    if (!moderators.length) {
+      console.warn('⚠️ Aucun modérateur trouvé → impossible de générer des rapports');
+      return;
+    }
+
+    if (!ppns.length) {
+      console.warn('⚠️ Aucun PPN trouvé → impossible de générer des rapports');
+      return;
     }
 
     const districtsByRegion = {
-      'DIANA': ['Ambilobe', 'Nosy Be'],
-      'SAVA': ['Sambava', 'Antalaha'],
-      'ITASY': ['Miarinarivo', 'Arivonimamo'],
-      'ANALAMANGA': ['Antananarivo', 'Ambohidratrimo'],
-      'VAKINANKARATRA': ['Antsirabe', 'Betafo'],
-      'BONGOLAVA': ['Tsiroanomandidy', 'Fenoarivobe'],
-      'SOFIA': ['Mandritsara', 'Antsohihy'],
-      'BOENY': ['Mahajanga', 'Ambato Boeny'],
-      'BETSIBOKA': ['Maevatanana', 'Tsaratanana'],
-      'MELAKY': ['Maintirano', 'Antsalova'],
-      'ALAOTRA_MANGORO': ['Ambatondrazaka', 'Moramanga'],
-      'ATSINANANA': ['Toamasina', 'Vatomandry'],
-      'ANALANJIROFO': ['Maroantsetra', 'Mananara Nord'],
-      'AMORON_I_MANIA': ['Ambositra', 'Fandriana'],
-      'HAUTE_MATSIATRA': ['Fianarantsoa', 'Ambalavao'],
-      'VATOVAVY_FITOVINANY': ['Manakara', 'Vohipeno'],
-      'ATSIMO_ATSINANANA': ['Farafangana', 'Vangaindrano'],
-      'IHOROMBE': ['Ihosy', 'Ivohibe'],
-      'MENABE': ['Morondava', 'Manja'],
-      'ATSIMO_ANDREFANA': ['Toliara', 'Sakaraha'],
-      'ANDROY': ['Ambovombe', 'Tsihombe'],
-      'ANOSY': ['Taolanaro', 'Amboasary']
+      'DIANA': ['Ambilobe', 'Nosy Be', 'Antsiranana'],
+      'SAVA': ['Sambava', 'Antalaha', 'Vohemar'],
+      'ITASY': ['Miarinarivo', 'Arivonimamo', 'Soavinandriana'],
+      'ANALAMANGA': ['Antananarivo', 'Ambohidratrimo', 'Anjozorobe'],
+      'VAKINANKARATRA': ['Antsirabe', 'Betafo', 'Ambatolampy'],
+      'BONGOLAVA': ['Tsiroanomandidy', 'Fenoarivobe', 'Faratsiho'],
+      'SOFIA': ['Mandritsara', 'Antsohihy', 'Mampikony'],
+      'BOENY': ['Mahajanga', 'Ambato Boeny', 'Marovoay'],
+      'BETSIBOKA': ['Maevatanana', 'Tsaratanana', 'Kandreho'],
+      'MELAKY': ['Maintirano', 'Antsalova', 'Besalampy'],
+      'ALAOTRA_MANGORO': ['Ambatondrazaka', 'Moramanga', 'Amparafaravola'],
+      'ATSINANANA': ['Toamasina', 'Vatomandry', 'Brickaville'],
+      'ANALANJIROFO': ['Maroantsetra', 'Mananara Nord', 'Sainte Marie'],
+      'AMORON_I_MANIA': ['Ambositra', 'Fandriana', 'Antsirabe II'],
+      'HAUTE_MATSIATRA': ['Fianarantsoa', 'Ambalavao', 'Manakara'],
+      'VATOVAVY_FITOVINANY': ['Manakara', 'Vohipeno', 'Ifanadiana'],
+      'ATSIMO_ATSINANANA': ['Farafangana', 'Vangaindrano', 'Midongy Atsimo'],
+      'IHOROMBE': ['Ihosy', 'Ivohibe', 'Ikalamavony'],
+      'MENABE': ['Morondava', 'Manja', 'Belo sur Tsiribihina'],
+      'ATSIMO_ANDREFANA': ['Toliara', 'Sakaraha', 'Betioky Sud'],
+      'ANDROY': ['Ambovombe', 'Tsihombe', 'Bekitro'],
+      'ANOSY': ['Taolanaro', 'Amboasary', 'Fort-Dauphin']
     };
 
     const rapports = [];
@@ -57,7 +73,8 @@ module.exports = {
     ];
 
     for (const moderator of moderators) {
-      const regionDistricts = districtsByRegion[moderator.region] || ['Unknown'];
+      const regionDistricts = districtsByRegion[moderator.region] || ['District inconnu'];
+
       for (let i = 0; i < 4; i++) {
         const ppn = ppns[Math.floor(Math.random() * ppns.length)];
         const district = regionDistricts[Math.floor(Math.random() * regionDistricts.length)];
@@ -78,18 +95,25 @@ module.exports = {
       }
     }
 
+    // Éviter les doublons (clé unique : employe_id + ppn_id + date)
     const existingRapports = await queryInterface.sequelize.query(
       `SELECT employe_id, ppn_id, date FROM Rapports`,
       { type: queryInterface.sequelize.QueryTypes.SELECT }
     );
 
-    const existingKeys = existingRapports.map(r => `${r.employe_id}-${r.ppn_id}-${moment(r.date).format('YYYY-MM-DD')}`);
-    const newRapports = rapports.filter(r =>
+    const existingKeys = existingRapports.map(r => 
+      `${r.employe_id}-${r.ppn_id}-${moment(r.date).format('YYYY-MM-DD')}`
+    );
+
+    const newRapports = rapports.filter(r => 
       !existingKeys.includes(`${r.employe_id}-${r.ppn_id}-${moment(r.date).format('YYYY-MM-DD')}`)
     );
 
     if (newRapports.length > 0) {
-      await queryInterface.bulkInsert('Rapports', newRapports);
+      await queryInterface.bulkInsert('Rapports', newRapports, {});
+      console.log(`→ ${newRapports.length} rapports insérés`);
+    } else {
+      console.log('→ Aucun nouveau rapport à insérer (déjà existants)');
     }
   },
 

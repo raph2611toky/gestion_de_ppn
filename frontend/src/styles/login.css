@@ -555,3 +555,42 @@
   color: #1e40af;
   transform: translateX(-2px);
 }
+
+/* Login Portal Tabs */
+.login-portal-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.login-portal-tab {
+  padding: var(--space-md);
+  font-size: 0.9rem;
+  font-weight: 600;
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  outline: none;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+}
+
+.login-portal-tab:hover:not(.active) {
+  border-color: var(--primary);
+  color: var(--primary);
+  background-color: rgba(30, 144, 255, 0.05);
+}
+
+.login-portal-tab.active {
+  background: linear-gradient(135deg, var(--primary) 0%, #1e40af 100%);
+  border-color: var(--primary);
+  color: white;
+  box-shadow: 0 4px 15px rgba(30, 144, 255, 0.3);
+}

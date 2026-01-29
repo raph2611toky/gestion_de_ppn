@@ -18,7 +18,7 @@ module.exports.IsAuthenticated = async (req, res, next) => {
         if (employe.fonction !== 'ADMINISTRATEUR' && employe.fonction !== 'MODERATEUR') {
             return res.status(401).json({ message: 'Token non autorisé.' });
         }
-        if (!req.employe?.is_active) {
+        if (!employe?.is_active) {
             return res.status(403).json({ message: 'Compte non encore activé / validé' });
         }
 
@@ -47,7 +47,7 @@ module.exports.IsAuthenticatedAdmin = async (req, res, next) => {
             return res.status(401).json({ message: 'Token non autorisé.' });
         }
 
-        if (!req.employe?.is_active) {
+        if (!employe?.is_active) {
             return res.status(403).json({ message: 'Compte non encore activé / validé' });
         }
 

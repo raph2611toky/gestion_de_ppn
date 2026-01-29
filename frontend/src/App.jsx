@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react'
+import { AuthProvider, useAuth } from './contexts/AuthContext.jsx'
 import { DataProvider } from './contexts/DataContext.jsx'
 import { ThemeProvider, useTheme } from './contexts/ThemeContext.jsx'
 import { NotificationProvider } from './components/Notifications.jsx'
@@ -30,7 +31,7 @@ function AppContent() {
   useEffect(() => {
     if (isAuthenticated && user) {
       if (!activePage) {
-        setActivePage(user.role === 'admin' ? 'admin-dashboard' : 'regional-dashboard')
+        setActivePage(user.fonction === 'ADMINISTRATEUR' ? 'admin-dashboard' : 'regional-dashboard')
       }
     }
   }, [isAuthenticated, user, activePage])
@@ -71,6 +72,7 @@ function AppContent() {
   }
 
   const renderPage = () => {
+    console.log('Rendering page:', activePage)
     switch (activePage) {
       case 'admin-dashboard':
         return <AdminDashboard onNavigate={setActivePage} />
@@ -89,7 +91,7 @@ function AppContent() {
       case 'profile':
         return <Profile onNavigate={setActivePage} />
       default:
-        return user.role === 'admin'
+        return user.fonction === 'ADMINISTRATEUR'
           ? <AdminDashboard onNavigate={setActivePage} />
           : <RegionalDashboard onNavigate={setActivePage} />
     }
@@ -118,11 +120,13 @@ function AppContent() {
 export default function App() {
   return (
     <ThemeProvider>
+      <AuthProvider>
         <DataProvider>
           <NotificationProvider>
             <AppContent />
           </NotificationProvider>
         </DataProvider>
+      </AuthProvider>
     </ThemeProvider>
   )
 }

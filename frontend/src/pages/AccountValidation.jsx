@@ -1,63 +1,121 @@
 'use client';
 
-import React, { useState } from 'react'
-import { useData } from '../contexts/DataContext.jsx'
+import React, { useState, useEffect } from 'react'
+import api from '../utils/api.js'
 import { useNotification, ConfirmDialog } from '../components/Notifications.jsx'
 
 function AccountValidation() {
-  const { accounts, updateAccountStatus } = useData()
   const { showNotification } = useNotification()
+  const [moderators, setModerators] = useState({})
+  const [loading, setLoading] = useState(true)
   const [showConfirm, setShowConfirm] = useState(false)
   const [confirmAction, setConfirmAction] = useState(null)
-  const [selectedAccount, setSelectedAccount] = useState(null)
+  const [selectedModerator, setSelectedModerator] = useState(null)
 
-  const handleStatusChange = (id, status, name) => {
-    setConfirmAction({ id, status, name })
+  // Charger la liste des modérateurs en attente
+  useEffect(() => {
+    fetchModerators()
+  }, [])
+
+  const fetchModerators = async () => {
+    try {
+      setLoading(true)
+      const response = await api.get('/moderators/pending/')
+      console.log('[+] Modérateurs récupérés:', response.data)
+      setModerators(response.data || {})
+    } catch (err) {
+      console.log('[v0] Erreur lors de la récupération des modérateurs:', err.message)
+      showNotification('error', 'Erreur lors du chargement des modérateurs')
+      setModerators([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchModeratorDetail = async (id) => {
+    try {
+      const response = await api.get(`/api/moderators/pending/${id}`)
+      console.log('[v0] Détail du modérateur:', response.data)
+      setSelectedModerator(response.data)
+    } catch (err) {
+      console.log('[v0] Erreur lors de la récupération du détail:', err.message)
+      showNotification('error', 'Erreur lors du chargement du profil')
+    }
+  }
+
+  const handleViewDetail = (moderator) => {
+    fetchModeratorDetail(moderator.id_employe)
+  }
+
+  const handleStatusChange = (id, action, name) => {
+    setConfirmAction({ id, action, name })
     setShowConfirm(true)
   }
 
-  const confirmStatusChange = () => {
+  const confirmStatusChange = async () => {
     if (!confirmAction) return
-    updateAccountStatus(confirmAction.id, confirmAction.status)
-    const message = confirmAction.status === 'approved' 
-      ? `Compte de ${confirmAction.name} approuve` 
-      : confirmAction.status === 'revoked'
-      ? `Acces de ${confirmAction.name} revoque`
-      : `Demande de ${confirmAction.name} rejetee`
-    showNotification('success', message)
-    setConfirmAction(null)
-  }
-
-  const pendingAccounts = accounts.filter(a => a.status === 'pending')
-  const approvedAccounts = accounts.filter(a => a.status === 'approved')
-  const revokedAccounts = accounts.filter(a => a.status === 'revoked')
-
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'pending': return 'badge badge-warning'
-      case 'approved': return 'badge badge-success'
-      case 'revoked': return 'badge badge-danger'
-      default: return 'badge'
+    
+    try {
+      const endpoint = confirmAction.action === 'validate' 
+        ? `/api/moderators/${confirmAction.id}/validate`
+        : `/api/moderators/${confirmAction.id}/reject`
+      
+      await api.post(endpoint, {})
+      
+      const message = confirmAction.action === 'validate'
+        ? `Modérateur ${confirmAction.name} validé`
+        : `Modérateur ${confirmAction.name} rejeté`
+      
+      showNotification('success', message)
+      setConfirmAction(null)
+      setSelectedModerator(null)
+      await fetchModerators()
+    } catch (err) {
+      console.log('[v0] Erreur lors de l\'action:', err.message)
+      showNotification('error', 'Erreur lors de l\'action')
     }
   }
 
-  const getStatusLabel = (status) => {
-    switch (status) {
-      case 'pending': return 'En attente'
-      case 'approved': return 'Approuve'
-      case 'revoked': return 'Revoque'
-      default: return status
-    }
+  // Séparer les modérateurs en attente et validés
+  console.log('Liste complète des modérateurs:', moderators)
+  const pendingModerators = moderators.pending || []
+  const validatedModerators = moderators.validated || []
+
+  const getVerifiedBadge = (isVerified) => {
+    return isVerified 
+      ? '<span className="badge badge-success">Vérifié</span>'
+      : '<span className="badge badge-warning">Non vérifié</span>'
+  }
+
+  const getValidatedBadge = (isValidated) => {
+    return isValidated
+      ? '<span className="badge badge-success">Validé</span>'
+      : '<span className="badge badge-warning">En attente</span>'
+  }
+
+  if (loading) {
+    return (
+      <div className="animate-fade-in">
+        <div className="section-card">
+          <div className="section-header">
+            <h2 className="section-title">
+              <span>⏳</span>
+              Chargement...
+            </h2>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="animate-fade-in">
-      {selectedAccount ? (
+      {selectedModerator ? (
         <div className="section-card">
           <div className="section-header">
             <button
               className="back-button"
-              onClick={() => setSelectedAccount(null)}
+              onClick={() => setSelectedModerator(null)}
               style={{ marginRight: 'auto' }}
             >
               <span>←</span>
@@ -65,84 +123,86 @@ function AccountValidation() {
             </button>
             <h2 className="section-title">
               <span>👤</span>
-              Details du compte
+              Détail du modérateur
             </h2>
           </div>
           <div className="section-body">
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '2rem' }}>
+            {/* Informations personnelles */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '2rem', marginBottom: '2rem' }}>
               <div>
                 <div style={{ marginBottom: '1.5rem' }}>
                   <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.5rem' }}>Nom complet</div>
-                  <div style={{ fontSize: '1rem', color: 'var(--text-primary)', fontWeight: 500 }}>{selectedAccount.name}</div>
-                </div>
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.5rem' }}>Nom d'utilisateur</div>
-                  <div style={{ fontSize: '1rem', color: 'var(--text-primary)', fontWeight: 500 }}>{selectedAccount.username}</div>
+                  <div style={{ fontSize: '1rem', color: 'var(--text-primary)', fontWeight: 500 }}>{selectedModerator.nom}</div>
                 </div>
                 <div style={{ marginBottom: '1.5rem' }}>
                   <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.5rem' }}>Email</div>
-                  <div style={{ fontSize: '1rem', color: 'var(--text-primary)', fontWeight: 500 }}>{selectedAccount.email}</div>
+                  <div style={{ fontSize: '1rem', color: 'var(--text-primary)', fontWeight: 500 }}>{selectedModerator.email}</div>
                 </div>
                 <div style={{ marginBottom: '1.5rem' }}>
                   <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.5rem' }}>CIN</div>
-                  <div style={{ fontSize: '1rem', color: 'var(--text-primary)', fontWeight: 500 }}>{selectedAccount.cin}</div>
+                  <div style={{ fontSize: '1rem', color: 'var(--text-primary)', fontWeight: 500 }}>{selectedModerator.cin}</div>
                 </div>
               </div>
               <div>
                 <div style={{ marginBottom: '1.5rem' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.5rem' }}>Region</div>
-                  <div style={{ fontSize: '1rem', color: 'var(--text-primary)', fontWeight: 500 }}>{selectedAccount.region}</div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.5rem' }}>Région</div>
+                  <div style={{ fontSize: '1rem', color: 'var(--text-primary)', fontWeight: 500 }}>{selectedModerator.moderateurDetails?.region || 'N/A'}</div>
                 </div>
                 <div style={{ marginBottom: '1.5rem' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.5rem' }}>Statut</div>
-                  <span className={getStatusBadge(selectedAccount.status)}>
-                    {getStatusLabel(selectedAccount.status)}
+                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.5rem' }}>Vérifié</div>
+                  <span className={selectedModerator.moderateurDetails?.is_verified ? 'badge badge-success' : 'badge badge-warning'}>
+                    {selectedModerator.moderateurDetails?.is_verified ? 'Oui' : 'Non'}
                   </span>
                 </div>
                 <div style={{ marginBottom: '1.5rem' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.5rem' }}>Date demande</div>
-                  <div style={{ fontSize: '1rem', color: 'var(--text-primary)', fontWeight: 500 }}>{new Date(selectedAccount.createdAt).toLocaleDateString('fr-FR')}</div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.5rem' }}>Validé</div>
+                  <span className={selectedModerator.moderateurDetails?.is_validated ? 'badge badge-success' : 'badge badge-warning'}>
+                    {selectedModerator.moderateurDetails?.is_validated ? 'Oui' : 'Non'}
+                  </span>
                 </div>
               </div>
             </div>
 
-            {selectedAccount.photo && (
-              <div style={{ marginTop: '2rem', marginBottom: '1.5rem' }}>
+            {/* Photo de profil */}
+            {selectedModerator.photo && (
+              <div style={{ marginBottom: '2rem' }}>
                 <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '1rem' }}>Photo de profil</div>
-                <img src={selectedAccount.photo} alt="Photo" style={{ width: '150px', height: '150px', borderRadius: '8px', objectFit: 'cover', border: '1px solid var(--border-color)' }} />
+                <img src={selectedModerator.photo || "/placeholder.svg"} alt="Photo profil" style={{ width: '150px', height: '150px', borderRadius: '8px', objectFit: 'cover', border: '1px solid var(--border-color)' }} />
               </div>
             )}
 
-            {selectedAccount.cinFront && (
-              <div style={{ marginTop: '2rem', marginBottom: '1.5rem' }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '1rem' }}>CIN - Recto</div>
-                <img src={selectedAccount.cinFront} alt="CIN Recto" style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '8px', border: '1px solid var(--border-color)' }} />
+            {/* Pièces d'identité */}
+            {selectedModerator.moderateurDetails?.piece_identite_recto && (
+              <div style={{ marginBottom: '2rem' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '1rem' }}>Pièce d'identité - Recto</div>
+                <img src={selectedModerator.moderateurDetails.piece_identite_recto || "/placeholder.svg"} alt="CIN Recto" style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '8px', border: '1px solid var(--border-color)' }} />
               </div>
             )}
 
-            {selectedAccount.cinBack && (
-              <div style={{ marginTop: '2rem', marginBottom: '1.5rem' }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '1rem' }}>CIN - Verso</div>
-                <img src={selectedAccount.cinBack} alt="CIN Verso" style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '8px', border: '1px solid var(--border-color)' }} />
+            {selectedModerator.moderateurDetails?.piece_identite_face && (
+              <div style={{ marginBottom: '2rem' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '1rem' }}>Pièce d'identité - Verso</div>
+                <img src={selectedModerator.moderateurDetails.piece_identite_face || "/placeholder.svg"} alt="CIN Verso" style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '8px', border: '1px solid var(--border-color)' }} />
               </div>
             )}
 
-            {selectedAccount.status === 'pending' && (
+            {/* Actions si en attente */}
+            {!selectedModerator.moderateurDetails?.is_validated && (
               <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
                 <button
                   className="btn btn-primary"
                   onClick={() => {
-                    handleStatusChange(selectedAccount.id, 'approved', selectedAccount.name)
-                    setSelectedAccount(null)
+                    handleStatusChange(selectedModerator.id_employe, 'validate', selectedModerator.nom)
+                    setSelectedModerator(null)
                   }}
                 >
-                  ✓ Approuver
+                  ✓ Valider
                 </button>
                 <button
                   className="btn btn-danger"
                   onClick={() => {
-                    handleStatusChange(selectedAccount.id, 'revoked', selectedAccount.name)
-                    setSelectedAccount(null)
+                    handleStatusChange(selectedModerator.id_employe, 'reject', selectedModerator.nom)
+                    setSelectedModerator(null)
                   }}
                 >
                   ✕ Rejeter
@@ -153,46 +213,58 @@ function AccountValidation() {
         </div>
       ) : (
         <>
-          {/* Pending Accounts */}
+          {/* Modérateurs en attente */}
           <div className="section-card">
             <div className="section-header">
               <h2 className="section-title">
                 <span>⏳</span>
-                Demandes en attente ({pendingAccounts.length})
+                Modérateurs en attente ({pendingModerators.length})
               </h2>
             </div>
             <div className="section-body no-padding">
-              {pendingAccounts.length > 0 ? (
+              {pendingModerators.length > 0 ? (
                 <div className="table-container">
                   <table className="table">
                     <thead>
                       <tr>
                         <th>Nom</th>
-                        <th>Utilisateur</th>
-                        <th>Region</th>
+                        <th>Email</th>
+                        <th>Région</th>
+                        <th>Vérifié</th>
+                        <th>Validé</th>
                         <th>Date demande</th>
                         <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {pendingAccounts.map(account => (
-                        <tr key={account.id}>
-                          <td style={{ fontWeight: 500, cursor: 'pointer', color: 'var(--primary)' }} onClick={() => setSelectedAccount(account)}>
-                            {account.name}
+                      {pendingModerators.map(moderator => (
+                        <tr key={moderator.id_employe}>
+                          <td style={{ fontWeight: 500, cursor: 'pointer', color: 'var(--primary)' }} onClick={() => handleViewDetail(moderator)}>
+                            {moderator.nom}
                           </td>
-                          <td>{account.username}</td>
-                          <td>{account.region}</td>
-                          <td>{new Date(account.createdAt).toLocaleDateString('fr-FR')}</td>
+                          <td>{moderator.email}</td>
+                          <td>{moderator.moderateurDetails?.region || 'N/A'}</td>
+                          <td>
+                            <span className={moderator.moderateurDetails?.is_verified ? 'badge badge-success' : 'badge badge-warning'}>
+                              {moderator.moderateurDetails?.is_verified ? 'Oui' : 'Non'}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={moderator.moderateurDetails?.is_validated ? 'badge badge-success' : 'badge badge-warning'}>
+                              {moderator.moderateurDetails?.is_validated ? 'Validé' : 'En attente'}
+                            </span>
+                          </td>
+                          <td>{new Date(moderator.createdAt).toLocaleDateString('fr-FR')}</td>
                           <td>
                             <button
                               className="action-btn action-btn-success"
-                              onClick={() => handleStatusChange(account.id, 'approved', account.name)}
+                              onClick={() => handleStatusChange(moderator.id_employe, 'validate', moderator.nom)}
                             >
-                              Approuver
+                              Valider
                             </button>
                             <button
                               className="action-btn action-btn-delete"
-                              onClick={() => handleStatusChange(account.id, 'revoked', account.name)}
+                              onClick={() => handleStatusChange(moderator.id_employe, 'reject', moderator.nom)}
                             >
                               Rejeter
                             </button>
@@ -205,88 +277,105 @@ function AccountValidation() {
               ) : (
                 <div className="empty-state">
                   <div className="empty-state-icon">✓</div>
-                  <p>Aucune demande en attente</p>
+                  <p>Aucun modérateur en attente</p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* All Accounts */}
+          {/* Tous les modérateurs */}
           <div className="section-card">
             <div className="section-header">
               <h2 className="section-title">
                 <span>👥</span>
-                Tous les comptes ({accounts.length})
+                Tous les modérateurs ({moderators.length})
               </h2>
             </div>
             <div className="section-body no-padding">
-              <div className="table-container">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Nom</th>
-                      <th>Utilisateur</th>
-                      <th>Region</th>
-                      <th>Statut</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[...approvedAccounts, ...revokedAccounts].map(account => (
-                      <tr key={account.id}>
-                        <td style={{ fontWeight: 500, cursor: 'pointer', color: 'var(--primary)' }} onClick={() => setSelectedAccount(account)}>
-                          {account.name}
-                        </td>
-                        <td>{account.username}</td>
-                        <td>{account.region}</td>
-                        <td>
-                          <span className={getStatusBadge(account.status)}>
-                            {getStatusLabel(account.status)}
-                          </span>
-                        </td>
-                        <td>
-                          {account.status === 'approved' ? (
-                            <button
-                              className="action-btn action-btn-delete"
-                              onClick={() => handleStatusChange(account.id, 'revoked', account.name)}
-                            >
-                              Revoquer
-                            </button>
-                          ) : (
-                            <button
-                              className="action-btn action-btn-success"
-                              onClick={() => handleStatusChange(account.id, 'approved', account.name)}
-                            >
-                              Reactiver
-                            </button>
-                          )}
-                        </td>
+              {moderators.length > 0 ? (
+                <div className="table-container">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Nom</th>
+                        <th>Email</th>
+                        <th>Région</th>
+                        <th>Vérifié</th>
+                        <th>Validé</th>
+                        <th>Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {moderators.map(moderator => (
+                        <tr key={moderator.id_employe}>
+                          <td style={{ fontWeight: 500, cursor: 'pointer', color: 'var(--primary)' }} onClick={() => handleViewDetail(moderator)}>
+                            {moderator.nom}
+                          </td>
+                          <td>{moderator.email}</td>
+                          <td>{moderator.moderateurDetails?.region || 'N/A'}</td>
+                          <td>
+                            <span className={moderator.moderateurDetails?.is_verified ? 'badge badge-success' : 'badge badge-warning'}>
+                              {moderator.moderateurDetails?.is_verified ? 'Oui' : 'Non'}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={moderator.moderateurDetails?.is_validated ? 'badge badge-success' : 'badge badge-warning'}>
+                              {moderator.moderateurDetails?.is_validated ? 'Validé' : 'En attente'}
+                            </span>
+                          </td>
+                          <td>
+                            <button
+                              className="action-btn action-btn-primary"
+                              onClick={() => handleViewDetail(moderator)}
+                            >
+                              Détail
+                            </button>
+                            {!moderator.moderateurDetails?.is_validated && (
+                              <>
+                                <button
+                                  className="action-btn action-btn-success"
+                                  onClick={() => handleStatusChange(moderator.id_employe, 'validate', moderator.nom)}
+                                >
+                                  Valider
+                                </button>
+                                <button
+                                  className="action-btn action-btn-delete"
+                                  onClick={() => handleStatusChange(moderator.id_employe, 'reject', moderator.nom)}
+                                >
+                                  Rejeter
+                                </button>
+                              </>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <div className="empty-state-icon">📭</div>
+                  <p>Aucun modérateur</p>
+                </div>
+              )}
             </div>
           </div>
         </>
       )}
 
-      {/* Confirmation Dialog */}
+      {/* Dialog de confirmation */}
       <ConfirmDialog
         isOpen={showConfirm}
         onClose={() => { setShowConfirm(false); setConfirmAction(null) }}
         onConfirm={confirmStatusChange}
-        title={
-          confirmAction?.status === 'approved' ? 'Approuver le compte' :
-          confirmAction?.status === 'revoked' ? "Revoquer l'acces" : "Confirmer l'action"
-        }
+        title={confirmAction?.action === 'validate' ? 'Valider le modérateur' : 'Rejeter le modérateur'}
         message={
-          confirmAction?.status === 'approved' 
-            ? `Etes-vous sur de vouloir approuver le compte de ${confirmAction?.name} ?`
-            : `Etes-vous sur de vouloir revoquer l'acces de ${confirmAction?.name} ?`
+          confirmAction?.action === 'validate'
+            ? `Êtes-vous sûr de vouloir valider ${confirmAction?.name} ?`
+            : `Êtes-vous sûr de vouloir rejeter ${confirmAction?.name} ?`
         }
-        confirmText={confirmAction?.status === 'approved' ? 'Approuver' : 'Revoquer'}
-        confirmStyle={confirmAction?.status === 'approved' ? 'primary' : 'danger'}
+        confirmText={confirmAction?.action === 'validate' ? 'Valider' : 'Rejeter'}
+        confirmStyle={confirmAction?.action === 'validate' ? 'primary' : 'danger'}
       />
     </div>
   )

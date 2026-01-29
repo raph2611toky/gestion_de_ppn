@@ -1,35 +1,64 @@
 'use client';
 
 import React, { useState } from 'react'
-import { useAuth } from '../contexts/AuthContext.jsx'
+import { useAuth } from '../contexts/AuthContext'
+import { useNotification } from '../components/Notifications'
 import '../styles/login.css'
 
 function Login({ onThemeToggle, theme, onRegister }) {
-  const [username, setUsername] = useState('')
+  const [portal, setPortal] = useState('admin')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [username, setUsername] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const { login } = useAuth()
+  const { login, getProfile } = useAuth()
+  const { showNotification } = useNotification()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
     setIsLoading(true)
 
-    if (!username || !password) {
+    if (!email || !password) {
       setError('Veuillez remplir tous les champs')
       setIsLoading(false)
       return
     }
 
-    setTimeout(() => {
-      const success = login(username, password)
-      if (!success) {
+    try {
+      // Appeler la méthode login du contexte (sauvegarde le token)
+      const loginSuccess = await login(email, password, portal)
+
+      if (loginSuccess) {
+        console.log('[v0] Connexion réussie, token sauvegardé')
+        
+        // Récupérer le profil complet avec le token envoyé dans l'en-tête
+        const profileData = await getProfile()
+        
+        if (profileData) {
+          console.log('[v0] Profil récupéré:', profileData)
+          // Afficher une notification de succès
+          showNotification('success', 'Connexion réussie!')
+          
+        } else {
+          setError('Erreur lors de la récupération du profil')
+          showNotification('error', 'Erreur lors de la récupération du profil')
+        }
+      } else {
+        // La méthode login a échoué
         setError('Identifiants incorrects')
+        showNotification('error', 'Identifiants incorrects')
       }
+    } catch (err) {
+      console.log('[v0] Erreur de connexion:', err.message)
+      const errorMsg = 'Une erreur est survenue lors de la connexion'
+      setError(errorMsg)
+      showNotification('error', errorMsg)
+    } finally {
       setIsLoading(false)
-    }, 500)
+    }
   }
 
   return (
@@ -56,16 +85,38 @@ function Login({ onThemeToggle, theme, onRegister }) {
             </div>
           )}
 
+          {/* Portal Selection */}
           <div className="login-input-group">
-            <label className="login-label">Nom d'utilisateur</label>
+            <label className="login-label">Sélectionner un portail</label>
+            <div className="login-portal-tabs">
+              <button
+                type="button"
+                className={`login-portal-tab ${portal === 'admin' ? 'active' : ''}`}
+                onClick={() => setPortal('admin')}
+              >
+                👨‍💼 Admin
+              </button>
+              <button
+                type="button"
+                className={`login-portal-tab ${portal === 'moderator' ? 'active' : ''}`}
+                onClick={() => setPortal('moderator')}
+              >
+                🛡️ Modérateur
+              </button>
+            </div>
+          </div>
+
+          <div className="login-input-group">
+            <label className="login-label">Email</label>
             <div className="login-input-wrapper">
-              <span className="login-input-icon">👤</span>
+              <span className="login-input-icon">📧</span>
               <input
-                type="text"
+                type="email"
                 className="login-input"
-                placeholder="Entrez votre nom d'utilisateur"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Entrez votre email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={isLoading}
               />
             </div>
           </div>
@@ -80,12 +131,14 @@ function Login({ onThemeToggle, theme, onRegister }) {
                 placeholder="Entrez votre mot de passe"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
                 style={{ paddingRight: '3rem' }}
               />
               <button
                 type="button"
                 className="login-password-toggle"
                 onClick={() => setShowPassword(!showPassword)}
+                disabled={isLoading}
               >
                 {showPassword ? '🙈' : '👁️'}
               </button>
@@ -107,7 +160,7 @@ function Login({ onThemeToggle, theme, onRegister }) {
         <div className="login-footer">
           <p className="login-footer-text">
             Pas encore de compte ?{' '}
-            <button className="login-footer-link" onClick={onRegister}>
+            <button className="login-footer-link" onClick={onRegister} disabled={isLoading}>
               Demander un acces
             </button>
           </p>
