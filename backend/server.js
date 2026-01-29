@@ -22,6 +22,7 @@ app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/api', require('./apps/routes/employe.route'));
 app.use('/api', require('./apps/routes/ppn.route.js'));
 app.use('/api', require('./apps/routes/rapport.route.js'))
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Testing API
 app.get('/', (req, res) => {

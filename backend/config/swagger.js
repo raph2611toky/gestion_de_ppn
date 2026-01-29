@@ -5,16 +5,10 @@ const options = {
     definition: {
         openapi: '3.0.0',
         info: {
-            title: 'Gestion de Stock API',
+            title: 'Gestion de PPN API',
             version: '1.0.0',
             description: 'API for managing employees and stock inventory',
         },
-        servers: [
-            {
-                url: 'http://10.1.1.199:8000',
-                description: 'Local server',
-            },
-        ],
         components: {
             securitySchemes: {
                 bearerAuth: {

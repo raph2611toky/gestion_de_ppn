@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react'
-import { AuthProvider, useAuth } from './contexts/AuthContext.jsx'
 import { DataProvider } from './contexts/DataContext.jsx'
 import { ThemeProvider, useTheme } from './contexts/ThemeContext.jsx'
 import { NotificationProvider } from './components/Notifications.jsx'
@@ -119,13 +118,11 @@ function AppContent() {
 export default function App() {
   return (
     <ThemeProvider>
-      <AuthProvider>
         <DataProvider>
           <NotificationProvider>
             <AppContent />
           </NotificationProvider>
         </DataProvider>
-      </AuthProvider>
     </ThemeProvider>
   )
 }

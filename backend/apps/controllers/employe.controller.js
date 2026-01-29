@@ -2,47 +2,82 @@ const { ValidationError, UniqueConstraintError, Op } = require("sequelize");
 const db = require("../models");
 const Helper = require('../../config/helper');
 const {generateToken} = require('../../utils/securite/jwt')
+const { sendOtpEmail, sendValidationEmail } = require('../../utils/email');
 
 // :::: Creat main models :::: //
 const Employe = db.Employe;
+const Moderateur = db.Moderateur;
+const OtpCode = db.OtpCode;
 
 // :::: 1 - create Employe :::: //
 const addEmploye = async (req, res) => {
-    // req.body.keys = ['cin','nom','email','password','confirm_password']
     try {
-        let {cin, nom, email, password, region, fonction}=req.body;
-        console.log(req.body)
-        if(!cin || !nom || !email || !password || !region){
-            return Helper.send_res(res, {erreur:"Tous les champs sont requis"}, 400)
+        let { cin, nom, email, password, region } = req.body;
+
+        if (!cin || !nom || !email || !password || !region) {
+            return Helper.send_res(res, { erreur: "Champs obligatoires manquants" }, 400);
         }
-        if (!fonction){fonction = 'MODERATEUR'}
-        if (cin < 100000000000 || 999999999999 < cin){
-            return Helper.send_res(res, {erreur: 'Le cin est invalide'}, 400)
+
+        if (String(cin).length !== 12 || isNaN(cin)) {
+            return Helper.send_res(res, { erreur: "CIN invalide (12 chiffres)" }, 400);
         }
-        const existingEmploye = await Employe.findOne({ where: { cin } });
-        if (existingEmploye) {
-            return Helper.send_res(res, { message: `Le cin ${cin} est déjà utilisé.` }, 401);
+
+        const existing = await Employe.findOne({ where: { [Op.or]: [{ cin }, { email }] } });
+        if (existing) {
+            return Helper.send_res(res, { message: "CIN ou email déjà utilisé" }, 409);
         }
-        // let confirm_password = req.body.confirm_password;
-        // if (password !== confirm_password) {
-        //     return Helper.send_res(res, { erreur: 'Les mots de passe fournies ne sont pas identiques' }, 401);
-        // }
-        let hashedPassword = await Helper.encryptPassword(password);
-        let info = {
-            cin:cin,
+
+        const hashedPassword = await Helper.encryptPassword(password);
+
+        // Gérer uploads
+        const photoPath = req.files?.photo ? req.files.photo[0].path : null;
+        const facePath = req.files?.piece_identite_face ? req.files.piece_identite_face[0].path : null;
+        const rectoPath = req.files?.piece_identite_recto ? req.files.piece_identite_recto[0].path : null;
+
+        const employe = await Employe.create({
+            cin,
             nom,
             email,
             password: hashedPassword,
+            fonction: 'MODERATEUR',
+            is_active: false,
+            photo: photoPath,
+        });
+
+        // Création Moderateur
+        await Moderateur.create({
+            employe_id: employe.id_employe,
             region,
-            fonction,
-        };
-        const employe_created = await Employe.create(info);
-        const message = `L'employé ${req.body.nom} a été créé avec succès.`;
-        return Helper.send_res(res, employe_created, 201);
+            piece_identite_face: facePath,
+            piece_identite_recto: rectoPath,
+            is_verified: false,
+            is_validated: false,
+        });
+
+        // Génération OTP (inchangé)
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        const expires = new Date(Date.now() + 10 * 60 * 1000);
+
+        await OtpCode.create({
+            employe_id: employe.id_employe,
+            code,
+            expires_at: expires,
+            used: false
+        });
+
+        const emailSent = await sendOtpEmail(email, code, nom);
+        if (!emailSent) {
+            console.warn("Échec envoi email OTP");
+        }
+
+        return Helper.send_res(res, {
+            message: "Compte créé. Vérifiez votre email pour activer.",
+            employe_id: employe.id_employe
+        }, 201);
+
     } catch (err) {
         console.error(err);
-        const message = `Impossible de créer cet employé ! Réessayez dans quelques instants.`;
-        return Helper.send_res(res, { erreur: message }, 400);
+        return Helper.send_res(res, { erreur: err.message || "Erreur serveur" }, 500);
     }
 };
 
@@ -118,7 +153,14 @@ const getProfileEmploye = async (req, res) => {
 // :::: 5 - update Employe by employe_id :::: //
 const updateEmploye = async (req, res) => {
     try {
-        const [updated] = await Employe.update(req.body, { where: { id_employe: req.employe.id_employe } });
+        const updateData = { ...req.body };
+
+        // Si nouvelle photo
+        if (req.file) {
+            updateData.photo = req.file.path;
+        }
+
+        const [updated] = await Employe.update(updateData, { where: { id_employe: req.employe.id_employe } });
         if (updated) {
             const updatedEmploye = await Employe.findOne({ where: { id_employe: req.employe.id_employe } });
             return Helper.send_res(res, updatedEmploye);
@@ -131,6 +173,126 @@ const updateEmploye = async (req, res) => {
         }
         const message = `Impossible de modifier cet Employe ! Réessayez dans quelques instants.`;
         return Helper.send_res(res, { erreur: message }, 500);
+    }
+};
+
+const verifyOtp = async (req, res) => {
+    try {
+        const { employe_id, code } = req.body;
+
+        if (!employe_id || !code) {
+            return Helper.send_res(res, { erreur: "employe_id et code requis" }, 400);
+        }
+
+        const employe = await Employe.findByPk(employe_id);
+        if (!employe || employe.fonction !== 'MODERATEUR') {
+            return Helper.send_res(res, { erreur: "Employé non trouvé ou non modérateur" }, 404);
+        }
+
+        const otp = await OtpCode.findOne({
+            where: {
+                employe_id,
+                code,
+                used: false,
+                expires_at: { [Op.gt]: new Date() }
+            }
+        });
+
+        if (!otp) {
+            return Helper.send_res(res, { erreur: "Code invalide ou expiré" }, 400);
+        }
+
+        // Mettre à jour Moderateur
+        const moderateur = await Moderateur.findOne({ where: { employe_id } });
+        if (moderateur) {
+            await moderateur.update({ is_verified: true });
+        }
+
+        // Supprimer l'OTP (ou tous les OTPs expirés/usés, mais ici supprimer celui-ci)
+        await otp.destroy();
+
+        return Helper.send_res(res, { message: "Email vérifié avec succès. En attente de validation admin." }, 200);
+
+    } catch (err) {
+        console.error(err);
+        return Helper.send_res(res, { erreur: "Erreur lors de la vérification" }, 500);
+    }
+};
+
+const getPendingModerators = async (req, res) => {
+    try {
+        const pending = await Employe.findAll({
+            where: {
+                fonction: 'MODERATEUR',
+                is_active: false
+            },
+            include: [{
+                model: Moderateur,
+                as: 'moderateurDetails',
+                where: { is_validated: false },
+                required: true
+            }]
+        });
+
+        return Helper.send_res(res, pending);
+    } catch (err) {
+        console.error(err);
+        return Helper.send_res(res, { erreur: "Erreur récupération liste" }, 500);
+    }
+};
+
+// Nouvelle: getPendingModeratorDetails
+const getPendingModeratorDetails = async (req, res) => {
+    try {
+        const id = req.params.id;
+
+        const moderator = await Employe.findByPk(id, {
+            where: {
+                fonction: 'MODERATEUR',
+                is_active: false
+            },
+            include: [{ model: Moderateur, as: 'moderateurDetails' }]
+        });
+
+        if (!moderator || moderator.moderateurDetails.is_validated) {
+            return Helper.send_res(res, { erreur: "Modérateur non trouvé ou déjà validé" }, 404);
+        }
+
+        return Helper.send_res(res, moderator);
+    } catch (err) {
+        console.error(err);
+        return Helper.send_res(res, { erreur: "Erreur récupération détails" }, 500);
+    }
+};
+
+// Nouvelle: validateModerator
+const validateModerator = async (req, res) => {
+    try {
+        const id = req.params.id;
+
+        const employe = await Employe.findByPk(id);
+        if (!employe || employe.fonction !== 'MODERATEUR' || employe.is_active) {
+            return Helper.send_res(res, { erreur: "Modérateur non trouvé ou déjà actif" }, 404);
+        }
+
+        const moderateur = await Moderateur.findOne({ where: { employe_id: id } });
+        if (!moderateur || !moderateur.is_verified) {
+            return Helper.send_res(res, { erreur: "Modérateur non vérifié ou non trouvé" }, 400);
+        }
+
+        // Valider
+        await moderateur.update({ is_validated: true });
+
+        const emailSent = await sendValidationEmail(employe.email, employe.nom);
+        if (!emailSent) {
+            console.warn("Échec envoi email validation");
+        }
+
+        return Helper.send_res(res, { message: "Modérateur validé avec succès" }, 200);
+
+    } catch (err) {
+        console.error(err);
+        return Helper.send_res(res, { erreur: "Erreur lors de la validation" }, 500);
     }
 };
 
@@ -150,25 +312,69 @@ const deleteEmploye = async (req, res) => {
     }
 };
 
-const login = async (req, res) => {
-    //request.body.keys() = ['email','password']
+const loginAdmin = async (req, res) => {
     const { email, password } = req.body;
     try {
-        console.log(req.body)
         const employe = await Employe.findOne({ where: { email } });
         if (!employe) {
             return Helper.send_res(res, { message: "Utilisateur non trouvé" }, 404);
         }
 
         const isPasswordValid = await Helper.checkPassword(password, employe.password);
-
         if (!isPasswordValid) {
             return Helper.send_res(res, { message: "Mot de passe incorrect" }, 401);
         }
 
+        if (employe.fonction !== 'ADMINISTRATEUR') {
+            return Helper.send_res(res, { message: "Accès réservé aux administrateurs" }, 403);
+        }
+
+        await employe.update({ is_active: true });
+
         const employeData = { employe_id: employe.id_employe };
         const token = generateToken(employeData);
-        return Helper.send_res(res, { token, fonction:employe.fonction, region:employe.region }, 200);
+        return Helper.send_res(res, { token, fonction: employe.fonction }, 200);
+    } catch (error) {
+        console.error('Erreur lors de la connexion :', error);
+        return Helper.send_res(res, { message: "Erreur lors de la connexion" }, 500);
+    }
+};
+
+const login = async (req, res) => {
+    const { email, password } = req.body;
+    try {
+        const employe = await Employe.findOne({ where: { email } });
+        if (!employe) {
+            return Helper.send_res(res, { message: "Utilisateur non trouvé" }, 404);
+        }
+
+        const isPasswordValid = await Helper.checkPassword(password, employe.password);
+        if (!isPasswordValid) {
+            return Helper.send_res(res, { message: "Mot de passe incorrect" }, 401);
+        }
+
+        if (employe.fonction !== 'MODERATEUR') {
+            return Helper.send_res(res, { message: "Accès réservé aux modérateurs" }, 403);
+        }
+
+        
+        // Pour modérateur, inclure region de Moderateur
+        let region = null;
+        if (employe.fonction === 'MODERATEUR') {
+            const moderateur = await Moderateur.findOne({ where: { employe_id: employe.id_employe } });
+            if (moderateur) region = moderateur.region;
+            if (!moderateur.is_verified) {
+                return Helper.send_res(res, { message: "Compte non vérifié" }, 403);
+            }
+            if (!moderateur.is_validated) {
+                return Helper.send_res(res, { message: "Compte non validé" }, 403);
+            }
+        }
+        await employe.update({ is_active: true });
+        
+        const employeData = { employe_id: employe.id_employe };
+        const token = generateToken(employeData);
+        return Helper.send_res(res, { token, fonction: employe.fonction, region }, 200);
     } catch (error) {
         console.error('Erreur lors de la connexion :', error);
         return Helper.send_res(res, { message: "Erreur lors de la connexion" }, 500);
@@ -181,6 +387,10 @@ module.exports = {
     getOneEmploye,
     updateEmploye,
     deleteEmploye,
-    login,
+    login,loginAdmin,
     getProfileEmploye,
+    verifyOtp,
+    getPendingModerators,
+    getPendingModeratorDetails,
+    validateModerator,
 };

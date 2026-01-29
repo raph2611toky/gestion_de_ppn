@@ -6,8 +6,9 @@ module.exports = (sequelize, DataTypes) => {
             autoIncrement: true,
         },
         cin: {
-            type: DataTypes.STRING,
-            autoIncrement: false,
+            type: DataTypes.STRING(12),
+            unique: true,
+            allowNull: false,
         },
         nom: {
             type: DataTypes.STRING(50),
@@ -21,41 +22,28 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.STRING,
             allowNull: false,
         },
-        region: {
-            type: DataTypes.ENUM([
-                'DIANA',
-                'SAVA',
-                'ITASY',
-                'ANALAMANGA',
-                'VAKINANKARATRA',
-                'BONGOLAVA',
-                'SOFIA',
-                'BOENY',
-                'BETSIBOKA',
-                'MELAKY',
-                'ALAOTRA_MANGORO',
-                'ATSINANANA',
-                'ANALANJIROFO',
-                'AMORON_I_MANIA',
-                'HAUTE_MATSIATRA',
-                'VATOVAVY_FITOVINANY',
-                'ATSIMO_ATSINANANA',
-                'IHOROMBE',
-                'MENABE',
-                'ATSIMO_ANDREFANA',
-                'ANDROY',
-                'ANOSY'
-            ]),
-            allowNull: false,
+        photo: {           
+            type: DataTypes.STRING,  
+            allowNull: true,
+        },
+        is_active: {           
+            type: DataTypes.BOOLEAN,
+            defaultValue: false,   
         },
         fonction: {
             type: DataTypes.ENUM(['MODERATEUR', 'ADMINISTRATEUR']),
             allowNull: false,
         },
+    }, {
+        tableName: 'employes',
+        timestamps: true,
+        paranoid: true,          
     });
 
     Employe.associate = (models) => {
         Employe.hasMany(models.Rapport, { foreignKey: 'employe_id', as: 'rapports' });
+        Employe.hasOne(models.Moderateur, { foreignKey: 'employe_id', as: 'moderateurDetails' });
+        Employe.hasMany(models.OtpCode,   { foreignKey: 'employe_id', as: 'otps' });
     };
 
     return Employe;

@@ -24,6 +24,8 @@ db.sequelize = sequelize;
 db.Employe = require("./employe.js")(sequelize, DataTypes);
 db.Ppn = require("./ppn")(sequelize, DataTypes);
 db.Rapport = require("./rapport")(sequelize, DataTypes);
+db.Moderateur = require('./moderateur')(sequelize, Sequelize.DataTypes);
+db.OtpCode     = require('./otpCode')(sequelize, Sequelize.DataTypes);
 
 Object.values(db).forEach(model => {
   if (model.associate) {

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const employeController = require('../controllers/employe.controller');
 const { IsAuthenticated, IsAuthenticatedAdmin } = require("../../middlewares/auth.middleware");
+const { uploadRegister, uploadPhoto } = require('../../middlewares/upload.middleware');
 
 /**
  * @swagger
@@ -57,7 +58,7 @@ const { IsAuthenticated, IsAuthenticatedAdmin } = require("../../middlewares/aut
  *             schema:
  *               $ref: '#/components/schemas/Message'
  */
-router.post('/register/admin', employeController.addEmploye);
+router.post('/register', uploadRegister, employeController.addEmploye);
 
 /**
  * @swagger
@@ -127,7 +128,7 @@ router.get('/employes', employeController.getAllEmploye);
  *     security:
  *       - bearerAuth: []
  */
-router.get('/employes/profile/:employe_id', IsAuthenticated, employeController.getOneEmploye);
+router.get('/employes/profile/:employe_id', IsAuthenticatedAdmin, employeController.getOneEmploye);
 
 /**
  * @swagger
@@ -218,7 +219,7 @@ router.get('/employes/profile', IsAuthenticated, employeController.getProfileEmp
  *     security:
  *       - bearerAuth: []
  */
-router.put('/employes/profile/update/', IsAuthenticated, employeController.updateEmploye);
+router.put('/employes/profile/update/', IsAuthenticated, uploadPhoto, employeController.updateEmploye);
 
 /**
  * @swagger
@@ -249,7 +250,7 @@ router.put('/employes/profile/update/', IsAuthenticated, employeController.updat
  *     security:
  *       - bearerAuth: []
  */
-router.delete('/employes/:employe_id', employeController.deleteEmploye);
+router.delete('/employes/:employe_id', IsAuthenticatedAdmin, employeController.deleteEmploye);
 
 /**
  * @swagger
@@ -298,5 +299,117 @@ router.delete('/employes/:employe_id', employeController.deleteEmploye);
  *               $ref: '#/components/schemas/Message'
  */
 router.post('/login', employeController.login);
+
+/**
+ * @swagger
+ * /api/login:
+ *   post:
+ *     summary: Login an employee
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, password]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: "rakoto@example.com"
+ *               password:
+ *                 type: string
+ *                 example: "password123"
+ *     responses:
+ *       200:
+ *         description: Login successful, returns JWT token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/LoginResponse'
+ *       401:
+ *         description: Invalid password
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Message'
+ *       404:
+ *         description: User not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Message'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Message'
+ */
+router.post('/login/admin', employeController.loginAdmin);
+
+/**
+ * @swagger
+ * /api/verify-otp:
+ *   post:
+ *     summary: Vérifier le code OTP pour vérification email
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [employe_id, code]
+ *             properties:
+ *               employe_id:
+ *                 type: integer
+ *                 example: 1
+ *               code:
+ *                 type: string
+ *                 example: "123456"
+ *     responses:
+ *       200:
+ *         description: OTP vérifié avec succès
+ *       400:
+ *         description: Code invalide ou expiré
+ *       404:
+ *         description: Employé non trouvé
+ */
+router.post('/verify-otp', employeController.verifyOtp);
+
+/**
+ * @swagger
+ * /api/moderators/pending:
+ *   get:
+ *     summary: Liste des modérateurs en attente de validation (admin only)
+ *     tags: [Moderateurs]
+ *     responses:
+ *       200:
+ *         description: Liste des modérateurs pending
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get('/moderators/pending', IsAuthenticatedAdmin, employeController.getPendingModerators);
+
+/**
+ * @swagger
+ * /api/moderators/validate/{id}:
+ *   post:
+ *     summary: Valider un modérateur (admin only)
+ *     tags: [Moderateurs]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: integer
+ *         required: true
+ *     responses:
+ *       200:
+ *         description: Modérateur validé
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post('/moderators/validate/:id', IsAuthenticatedAdmin, employeController.validateModerator);
 
 module.exports = router;
