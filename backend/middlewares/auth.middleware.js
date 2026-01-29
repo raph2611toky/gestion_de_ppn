@@ -36,7 +36,6 @@ module.exports.IsAuthenticatedAdmin = async (req, res, next) => {
 
     try {
         const decoded = verifyToken(token);
-        console.log('Decoded JWT:', decoded);
         
         const employe = await Employe.findOne({ where: { id_employe: decoded.employe_id } });
         if (!employe) {

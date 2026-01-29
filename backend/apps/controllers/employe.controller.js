@@ -4,6 +4,8 @@ const Helper = require('../../config/helper');
 const {generateToken} = require('../../utils/securite/jwt')
 const { sendOtpEmail, sendValidationEmail } = require('../../utils/email');
 
+const { toPublicUrl } = require('../../utils/helper');
+
 // :::: Creat main models :::: //
 const Employe = db.Employe;
 const Moderateur = db.Moderateur;
@@ -243,44 +245,68 @@ const updateEmploye = async (req, res) => {
 
 const verifyOtp = async (req, res) => {
     try {
-        const { employe_id, code } = req.body;
+        const { email, code_otp } = req.body;
 
-        if (!employe_id || !code) {
-            return Helper.send_res(res, { erreur: "employe_id et code requis" }, 400);
+        if (!email || !code_otp) {
+            return Helper.send_res(res, { 
+                erreur: "Les champs 'email' et 'code_otp' sont requis" 
+            }, 400);
         }
 
-        const employe = await Employe.findByPk(employe_id);
-        if (!employe || employe.fonction !== 'MODERATEUR') {
-            return Helper.send_res(res, { erreur: "Employé non trouvé ou non modérateur" }, 404);
+        const employe = await Employe.findOne({ 
+            where: { email } 
+        });
+
+        if (!employe) {
+            return Helper.send_res(res, { 
+                erreur: "Aucun compte associé à cet email" 
+            }, 404);
         }
 
+        if (employe.fonction !== 'MODERATEUR') {
+            return Helper.send_res(res, { 
+                erreur: "Cette vérification est réservée aux modérateurs" 
+            }, 403);
+        }
+
+        // Recherche du code OTP valide
         const otp = await OtpCode.findOne({
             where: {
-                employe_id,
-                code,
+                employe_id: employe.id_employe,
+                code: code_otp,
                 used: false,
                 expires_at: { [Op.gt]: new Date() }
             }
         });
 
         if (!otp) {
-            return Helper.send_res(res, { erreur: "Code invalide ou expiré" }, 400);
+            return Helper.send_res(res, { 
+                erreur: "Code OTP invalide, déjà utilisé ou expiré" 
+            }, 400);
         }
 
-        // Mettre à jour Moderateur
-        const moderateur = await Moderateur.findOne({ where: { employe_id } });
+        const moderateur = await Moderateur.findOne({ 
+            where: { employe_id: employe.id_employe } 
+        });
+
         if (moderateur) {
             await moderateur.update({ is_verified: true });
+        } else {
+            console.warn(`Modérateur non trouvé pour employe_id: ${employe.id_employe}`);
         }
 
-        // Supprimer l'OTP (ou tous les OTPs expirés/usés, mais ici supprimer celui-ci)
         await otp.destroy();
 
-        return Helper.send_res(res, { message: "Email vérifié avec succès. En attente de validation admin." }, 200);
+        return Helper.send_res(res, { 
+            message: "Email vérifié avec succès. En attente de validation par un administrateur.",
+            employe_id: employe.id_employe 
+        }, 200);
 
     } catch (err) {
-        console.error(err);
-        return Helper.send_res(res, { erreur: "Erreur lors de la vérification" }, 500);
+        console.error('Erreur lors de la vérification OTP :', err);
+        return Helper.send_res(res, { 
+            erreur: "Erreur serveur lors de la vérification du code" 
+        }, 500);
     }
 };
 
@@ -304,7 +330,7 @@ const getPendingModerators = async (req, res) => {
             include: [{
                 model: Moderateur,
                 as: 'moderateurDetails',
-                where: { is_validated: false },
+                where: { is_validated: true },
                 required: true
             }]
         });
@@ -321,19 +347,28 @@ const getPendingModeratorDetails = async (req, res) => {
     try {
         const id = req.params.id;
 
-        const moderator = await Employe.findByPk(id, {
-            where: {
-                fonction: 'MODERATEUR',
-                is_active: false
-            },
-            include: [{ model: Moderateur, as: 'moderateurDetails' }]
-        });
+        const moderator = await Employe.findOne({
+                where: { id_employe: id, fonction: 'MODERATEUR' },
+                include: [{ model: Moderateur, as: 'moderateurDetails' }],
+            });
 
-        if (!moderator || moderator.moderateurDetails.is_validated) {
+        if (!moderator || !moderator?.moderateurDetails?.is_validated || !moderator?.moderateurDetails?.is_verified) {
             return Helper.send_res(res, { erreur: "Modérateur non trouvé ou déjà validé" }, 404);
         }
 
-        return Helper.send_res(res, moderator);
+        const data = moderator.toJSON();
+
+        data.photo = toPublicUrl(req, data.photo);
+
+        if (data.moderateurDetails) {
+        data.moderateurDetails.piece_identite_face =
+            toPublicUrl(req, data.moderateurDetails.piece_identite_face);
+
+        data.moderateurDetails.piece_identite_recto =
+            toPublicUrl(req, data.moderateurDetails.piece_identite_recto);
+        }
+
+        return Helper.send_res(res, data);
     } catch (err) {
         console.error(err);
         return Helper.send_res(res, { erreur: "Erreur récupération détails" }, 500);
