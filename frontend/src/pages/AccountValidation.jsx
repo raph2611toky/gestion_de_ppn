@@ -34,7 +34,7 @@ function AccountValidation() {
 
   const fetchModeratorDetail = async (id) => {
     try {
-      const response = await api.get(`/api/moderators/pending/${id}`)
+      const response = await api.get(`/moderators/pending/${id}`)
       console.log('[v0] Détail du modérateur:', response.data)
       setSelectedModerator(response.data)
     } catch (err) {
@@ -57,8 +57,8 @@ function AccountValidation() {
     
     try {
       const endpoint = confirmAction.action === 'validate' 
-        ? `/api/moderators/${confirmAction.id}/validate`
-        : `/api/moderators/${confirmAction.id}/reject`
+        ? `/moderators/${confirmAction.id}/validate`
+        : `/moderators/${confirmAction.id}/reject`
       
       await api.post(endpoint, {})
       
@@ -288,11 +288,11 @@ function AccountValidation() {
             <div className="section-header">
               <h2 className="section-title">
                 <span>👥</span>
-                Tous les modérateurs ({moderators.length})
+                Tous les modérateurs ({validatedModerators.length})
               </h2>
             </div>
             <div className="section-body no-padding">
-              {moderators.length > 0 ? (
+              {validatedModerators.length > 0 ? (
                 <div className="table-container">
                   <table className="table">
                     <thead>
@@ -306,7 +306,7 @@ function AccountValidation() {
                       </tr>
                     </thead>
                     <tbody>
-                      {moderators.map(moderator => (
+                      {validatedModerators.map(moderator => (
                         <tr key={moderator.id_employe}>
                           <td style={{ fontWeight: 500, cursor: 'pointer', color: 'var(--primary)' }} onClick={() => handleViewDetail(moderator)}>
                             {moderator.nom}

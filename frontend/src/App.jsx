@@ -50,7 +50,15 @@ function AppContent() {
       )
     }
     if (showRegister) {
-      return <Register onBack={() => setShowRegister(false)} />
+      return <Register
+                onBack={() => setShowRegister(false)}
+                onRegistered={(email) => {
+                  setOtpEmail(email);
+                  setShowRegister(false);
+                  setShowOTP(true);
+                }}
+              />
+
     }
     return <Login onThemeToggle={toggleTheme} theme={theme} onRegister={() => setShowRegister(true)} />
   }

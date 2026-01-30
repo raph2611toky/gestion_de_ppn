@@ -1,13 +1,15 @@
-'use client';
+'use client'
 
 import React, { useState } from 'react'
-import { useData, REGIONS } from '../contexts/DataContext.jsx'
+import api from '../utils/api'
+import { REGIONS } from '../contexts/DataContext.jsx'
 import { useNotification } from '../components/Notifications.jsx'
 import '../styles/login.css'
 
-function Register({ onBack }) {
+function Register({ onBack, onRegistered }) {
   const [step, setStep] = useState(1)
   const [formData, setFormData] = useState({
+    // on garde les champs UI existants
     name: '',
     username: '',
     cin: '',
@@ -27,7 +29,6 @@ function Register({ onBack }) {
     cinBack: null,
   })
   const { showNotification } = useNotification()
-  const { addAccount } = useData()
 
   const handleFileChange = (e, fieldName) => {
     const file = e.target.files[0]
@@ -68,11 +69,12 @@ function Register({ onBack }) {
     setStep(1)
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
     setIsLoading(true)
 
+    // on garde tes validations UI (username est toujours obligatoire côté UI)
     if (!formData.username || !formData.email || !formData.password || !formData.region) {
       setError('Veuillez remplir tous les champs obligatoires')
       setIsLoading(false)
@@ -97,22 +99,50 @@ function Register({ onBack }) {
       return
     }
 
-    setTimeout(() => {
-      addAccount({
-        name: formData.name,
-        username: formData.username,
-        cin: formData.cin,
-        region: formData.region,
-        email: formData.email,
-        photo: previews.photo,
-        cinFront: previews.cinFront,
-        cinBack: previews.cinBack,
+    try {
+      // IMPORTANT: le backend attend nom (pas name), et les fichiers piece_identite_face/recto (pas cinFront/cinBack) [file:25]
+      const payload = new FormData()
+      payload.append('cin', formData.cin)
+      payload.append('nom', formData.name)
+      payload.append('email', formData.email)
+      payload.append('password', formData.password)
+      payload.append('region', formData.region)
+
+      if (formData.photo) payload.append('photo', formData.photo)
+
+      // mapping UI -> backend
+      if (formData.cinFront) payload.append('piece_identite_recto', formData.cinFront)
+      if (formData.cinBack) payload.append('piece_identite_face', formData.cinBack)
+
+      console.log('cinFront file:', formData.cinFront);
+      console.log('cinBack file:', formData.cinBack);
+
+
+      // ton api.js a déjà baseURL + json headers; ici on force multipart sur cette requête [file:25]
+      await api.post('/register', payload, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       })
 
-      showNotification('success', 'Demande envoyee ! Un administrateur validera votre compte.')
+      showNotification('success', 'Compte créé. Vérifiez votre email pour activer votre compte.')
+
+      // Si tu veux aller sur OTP (recommandé), utilise onRegistered (voir snippet App.jsx plus bas)
+      if (typeof onRegistered === 'function') {
+        onRegistered(formData.email)
+        return
+      }
+
+      // sinon comportement actuel: retour login
+      setTimeout(() => onBack(), 1500)
+    } catch (err) {
+      const msg =
+        err.response?.data?.erreur ||
+        err.response?.data?.message ||
+        'Erreur lors de l’inscription'
+      setError(msg)
+      showNotification('error', msg)
+    } finally {
       setIsLoading(false)
-      onBack()
-    }, 500)
+    }
   }
 
   return (
@@ -188,7 +218,7 @@ function Register({ onBack }) {
                       accept="image/*"
                       onChange={(e) => handleFileChange(e, 'cinFront')}
                     />
-                    <span className="upload-placeholder" style={{opacity: 0.7}}>
+                    <span className="upload-placeholder" style={{ opacity: 0.7 }}>
                       <span>Changer l'image</span>
                     </span>
                   </label>
@@ -220,7 +250,7 @@ function Register({ onBack }) {
                       accept="image/*"
                       onChange={(e) => handleFileChange(e, 'cinBack')}
                     />
-                    <span className="upload-placeholder" style={{opacity: 0.7}}>
+                    <span className="upload-placeholder" style={{ opacity: 0.7 }}>
                       <span>Changer l'image</span>
                     </span>
                   </label>
@@ -269,7 +299,7 @@ function Register({ onBack }) {
                       accept="image/*"
                       onChange={(e) => handleFileChange(e, 'photo')}
                     />
-                    <span className="upload-placeholder" style={{opacity: 0.7}}>
+                    <span className="upload-placeholder" style={{ opacity: 0.7 }}>
                       <span>Changer l'image</span>
                     </span>
                   </label>
@@ -331,8 +361,10 @@ function Register({ onBack }) {
                 onChange={(e) => setFormData({ ...formData, region: e.target.value })}
               >
                 <option value="">Selectionner une region</option>
-                {REGIONS.map(region => (
-                  <option key={region} value={region}>{region}</option>
+                {REGIONS.map((region) => (
+                  <option key={region} value={region}>
+                    {region}
+                  </option>
                 ))}
               </select>
             </div>
@@ -346,7 +378,7 @@ function Register({ onBack }) {
                 <span>←</span>
                 <span>Retour</span>
               </button>
-              <button type="submit" className="login-submit" disabled={isLoading} style={{flex: 1}}>
+              <button type="submit" className="login-submit" disabled={isLoading} style={{ flex: 1 }}>
                 {isLoading ? (
                   <>
                     <span className="spinner"></span>
