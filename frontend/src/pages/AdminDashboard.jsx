@@ -1,23 +1,54 @@
 'use client';
 
-import React from 'react'
-import { useData } from '../contexts/DataContext.jsx'
+import React, { useState, useEffect } from 'react'
+import api from '../utils/api.js'
+import { useNotification } from '../components/Notifications.jsx'
 
 function AdminDashboard({ onNavigate }) {
-  const { ppnList, priceReports, accounts } = useData()
-  
-  const pendingAccounts = accounts.filter(a => a.status === 'pending').length
-  const totalReportsThisMonth = priceReports.filter(r => {
-    const reportDate = new Date(r.date)
-    const now = new Date()
-    return reportDate.getMonth() === now.getMonth() && reportDate.getFullYear() === now.getFullYear()
-  }).length
+  const { showNotification } = useNotification()
+  const [dashboardData, setDashboardData] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    fetchDashboardData()
+  }, [])
+
+  const fetchDashboardData = async () => {
+    setIsLoading(true)
+    try {
+      console.log('[v0] Fetching admin dashboard data...')
+      const response = await api.get('/dashboard')
+      setDashboardData(response.data)
+      console.log('[v0] Admin dashboard data:', response.data)
+    } catch (err) {
+      console.log('[v0] Erreur lors du chargement du dashboard admin:', err.message)
+      showNotification('error', 'Impossible de charger les données du dashboard')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center' }}>
+        Chargement du dashboard...
+      </div>
+    )
+  }
+
+  if (!dashboardData) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center', color: '#dc2626' }}>
+        Erreur lors du chargement des données
+      </div>
+    )
+  }
 
   const stats = [
     { 
       id: 'ppn-management',
       label: 'Produits PPN', 
-      value: ppnList.length, 
+      value: dashboardData.stats?.produitsPpn || 0, 
       icon: '📦', 
       color: '#2563eb',
       bgColor: '#dbeafe'
@@ -25,7 +56,7 @@ function AdminDashboard({ onNavigate }) {
     { 
       id: 'account-validation',
       label: 'Comptes en attente', 
-      value: pendingAccounts, 
+      value: dashboardData.stats?.comptesEnAttente || 0, 
       icon: '👥', 
       color: '#f59e0b',
       bgColor: '#fef3c7'
@@ -33,7 +64,7 @@ function AdminDashboard({ onNavigate }) {
     { 
       id: 'analytics',
       label: 'Rapports ce mois', 
-      value: totalReportsThisMonth, 
+      value: dashboardData.stats?.rapportsThisMonth || 0, 
       icon: '📊', 
       color: '#10b981',
       bgColor: '#d1fae5'
@@ -41,14 +72,22 @@ function AdminDashboard({ onNavigate }) {
     { 
       id: 'analytics',
       label: 'Total rapports', 
-      value: priceReports.length, 
+      value: dashboardData.stats?.totalRapports || 0, 
       icon: '📈', 
       color: '#8b5cf6',
       bgColor: '#ede9fe'
     },
+    {
+      id: 'analytics',
+      label: 'Régions', 
+      value: dashboardData.stats?.nombreRegions || 0, 
+      icon: '🗺️', 
+      color: '#ec4899',
+      bgColor: '#fce7f3'
+    },
   ]
 
-  const recentReports = [...priceReports]
+  const recentReports = (dashboardData.latestRapports || [])
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 5)
 
@@ -82,30 +121,48 @@ function AdminDashboard({ onNavigate }) {
           </h2>
         </div>
         <div className="section-body no-padding">
-          <div className="table-container">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Produit</th>
-                  <th>Prix</th>
-                  <th>Region</th>
-                  <th>Date</th>
-                  <th>Agent</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentReports.map(report => (
-                  <tr key={report.id}>
-                    <td>{report.ppnName}</td>
-                    <td style={{ fontWeight: 600 }}>{report.price.toLocaleString()} Ar</td>
-                    <td>{report.region}</td>
-                    <td>{new Date(report.date).toLocaleDateString('fr-FR')}</td>
-                    <td>{report.reportedBy}</td>
+          {recentReports.length > 0 ? (
+            <div className="table-container">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Produit</th>
+                    <th>Prix unitaire</th>
+                    <th>Prix gros</th>
+                    <th>District</th>
+                    <th>Date</th>
+                    <th>Agent</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {recentReports.map(report => (
+                    <tr key={report.idrapport || report.id_rapport}>
+                      <td style={{ fontWeight: 500 }}>{report.ppn?.nomppn || 'N/A'}</td>
+                      <td>
+                        {(report.prix_unitaire_min || report.prix_unitaire_min) ? 
+                          `${(report.prix_unitaire_min || report.prix_unitaire_min).toLocaleString()} - ${(report.prix_unitaire_max || report.prix_unitaire_max).toLocaleString()} Ar` 
+                          : 'N/A'
+                        }
+                      </td>
+                      <td>
+                        {(report.prix_gros_min || report.prix_gros_min) ? 
+                          `${(report.prix_gros_min || report.prix_gros_min).toLocaleString()} - ${(report.prix_gros_max || report.prix_gros_max).toLocaleString()} Ar` 
+                          : 'N/A'
+                        }
+                      </td>
+                      <td>{report.district}</td>
+                      <td>{new Date(report.date).toLocaleDateString('fr-FR')}</td>
+                      <td>{report.employe?.nom || 'N/A'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div style={{ padding: '2rem', textAlign: 'center', color: '#999' }}>
+              Aucun rapport pour le moment
+            </div>
+          )}
         </div>
       </div>
     </div>
