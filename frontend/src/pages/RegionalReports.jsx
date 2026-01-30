@@ -28,10 +28,10 @@ function RegionalReports() {
     setIsLoading(true)
     try {
       const response = await api.get('/rapports/my')
-      console.log('[v0] Mes rapports chargés:', response.data)
+      console.log('[+] Mes rapports chargés:', response.data)
       setRapports(response.data)
     } catch (err) {
-      console.log('[v0] Erreur lors du chargement des rapports:', err.message)
+      console.log('[+] Erreur lors du chargement des rapports:', err.message)
       showError('Impossible de charger les rapports')
     } finally {
       setIsLoading(false)
@@ -44,7 +44,7 @@ function RegionalReports() {
       const response = await api.get('/ppns')
       setPpns(response.data)
     } catch (err) {
-      console.log('[v0] Erreur lors du chargement des PPNs:', err.message)
+      console.log('[+] Erreur lors du chargement des PPNs:', err.message)
     }
   }, [])
 
@@ -69,14 +69,14 @@ function RegionalReports() {
     
     setIsSubmitting(true)
     try {
-      await api.delete(`/rapports/${selectedRapport.idrapport}`)
-      console.log('[v0] Rapport supprimé:', selectedRapport.idrapport)
-      setRapports(rapports.filter(r => r.idrapport !== selectedRapport.idrapport))
+      await api.delete(`/rapports/${selectedRapport.id_rapport}`)
+      console.log('[+] Rapport supprimé:', selectedRapport.id_rapport)
+      setRapports(rapports.filter(r => r.id_rapport !== selectedRapport.id_rapport))
       showSuccess('Rapport supprimé avec succès')
       setShowDeleteConfirm(false)
       setSelectedRapport(null)
     } catch (err) {
-      console.log('[v0] Erreur lors de la suppression:', err.message)
+      console.log('[+] Erreur lors de la suppression:', err.message)
       if (err.response?.status === 403) {
         showError('Vous ne pouvez supprimer que vos propres rapports')
       } else {
@@ -91,7 +91,7 @@ function RegionalReports() {
     navigate('/dashboard/add-report', { state: { rapport } })
   }
 
-  if (selectedRapport && selectedRapport.idrapport) {
+  if (selectedRapport && selectedRapport.id_rapport) {
     return (
       <div className="animate-fade-in">
         <div className="section-card">
@@ -260,7 +260,7 @@ function RegionalReports() {
                   </thead>
                   <tbody>
                     {paginatedReports.map(rapport => (
-                      <tr key={rapport.idrapport}>
+                      <tr key={rapport.id_rapport}>
                         <td style={{ fontWeight: 500 }}>{rapport.ppn?.nom_ppn}</td>
                         <td>{rapport.prix_unitaire_min}</td>
                         <td>{rapport.prix_unitaire_max}</td>

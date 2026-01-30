@@ -38,7 +38,7 @@ function AddReport() {
         const response = await api.get('/ppns')
         setPpns(response.data)
       } catch (err) {
-        console.log('[v0] Erreur lors du chargement des PPNs:', err.message)
+        console.log('[+] Erreur lors du chargement des PPNs:', err.message)
         showError('Impossible de charger les PPNs')
       } finally {
         setIsLoading(false)
@@ -105,12 +105,12 @@ function AddReport() {
         // Modification
         const rapport = location.state.rapport
         await api.put(`/rapports/${rapport.idrapport}`, payload)
-        console.log('[v0] Rapport modifié:', rapport.idrapport)
+        console.log('[+] Rapport modifié:', rapport.idrapport)
         showSuccess('Rapport modifié avec succès')
       } else {
         // Création
         const response = await api.post('/rapports', payload)
-        console.log('[v0] Rapport créé:', response.data)
+        console.log('[+] Rapport créé:', response.data)
         showSuccess('Rapport créé avec succès')
       }
       
@@ -118,7 +118,7 @@ function AddReport() {
         navigate('/dashboard/regional-reports')
       }, 500)
     } catch (err) {
-      console.log('[v0] Erreur lors de la soumission:', err.message)
+      console.log('[+] Erreur lors de la soumission:', err.message)
       if (err.response?.status === 403) {
         setError('Vous ne pouvez modifier que vos propres rapports')
       } else if (err.response?.data?.message) {
