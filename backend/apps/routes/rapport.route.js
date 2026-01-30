@@ -775,4 +775,103 @@ router.delete('/rapports/:id_rapport', IsAuthenticated, rapportController.delete
  */
 router.get('/rapports/dashboard/full', IsAuthenticatedAdmin, rapportController.getDashboard);
 
+/**
+ * @swagger
+ * /api/rapports/dashboard/moderateur:
+ *   get:
+ *     summary: Dashboard modérateur (PPN, rapports, régions, derniers rapports)
+ *     tags: [Rapports]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Dashboard modérateur
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 region:
+ *                   type: string
+ *                   example: ANALAMANGA
+ *                 stats:
+ *                   type: object
+ *                   properties:
+ *                     produitsPpn:
+ *                       type: integer
+ *                       example: 5
+ *                     rapportsThisMonth:
+ *                       type: integer
+ *                       example: 0
+ *                     totalRapports:
+ *                       type: integer
+ *                       example: 8
+ *                     nombreRegions:
+ *                       type: integer
+ *                       example: 22
+ *                 ppns:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id_ppn:
+ *                         type: integer
+ *                         example: 1
+ *                       nom_ppn:
+ *                         type: string
+ *                         example: Riz local
+ *                       description:
+ *                         type: string
+ *                         example: Riz blanc local
+ *                       unite_mesure_unitaire:
+ *                         type: string
+ *                         example: KG
+ *                         nullable: true
+ *                       unite_mesure_gros:
+ *                         type: string
+ *                         example: SAC
+ *                         nullable: true
+ *                       observation:
+ *                         type: string
+ *                         example: Produit saisonnier
+ *                         nullable: true
+ *                       employe_id:
+ *                         type: integer
+ *                         example: 1
+ *                 latestRapports:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Rapport'
+ *       401:
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       403:
+ *         description: Forbidden (modérateur seulement)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Profil modérateur introuvable
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.get(
+  '/rapports/dashboard/moderateur',
+  IsAuthenticated,
+  rapportController.getModeratorDashboard
+);
+
+
 module.exports = router;

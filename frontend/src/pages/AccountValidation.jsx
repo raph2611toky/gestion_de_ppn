@@ -24,7 +24,7 @@ function AccountValidation() {
       console.log('[+] Modérateurs récupérés:', response.data)
       setModerators(response.data || {})
     } catch (err) {
-      console.log('[v0] Erreur lors de la récupération des modérateurs:', err.message)
+      console.log('[+] Erreur lors de la récupération des modérateurs:', err.message)
       showNotification('error', 'Erreur lors du chargement des modérateurs')
       setModerators([])
     } finally {
@@ -35,10 +35,10 @@ function AccountValidation() {
   const fetchModeratorDetail = async (id) => {
     try {
       const response = await api.get(`/moderators/pending/${id}`)
-      console.log('[v0] Détail du modérateur:', response.data)
+      console.log('[+] Détail du modérateur:', response.data)
       setSelectedModerator(response.data)
     } catch (err) {
-      console.log('[v0] Erreur lors de la récupération du détail:', err.message)
+      console.log('[+] Erreur lors de la récupération du détail:', err.message)
       showNotification('error', 'Erreur lors du chargement du profil')
     }
   }
@@ -71,7 +71,7 @@ function AccountValidation() {
       setSelectedModerator(null)
       await fetchModerators()
     } catch (err) {
-      console.log('[v0] Erreur lors de l\'action:', err.message)
+      console.log('[+] Erreur lors de l\'action:', err.message)
       showNotification('error', 'Erreur lors de l\'action')
     }
   }

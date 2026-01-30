@@ -98,8 +98,7 @@ const getAllPpn = async (req, res) => {
                     model: Employe,
                     as: 'ppns_employe'
                 }],
-                order: [['nom_ppn', 'ASC']],
-                limit: 50
+                order: [['nom_ppn', 'ASC']]
             });
         } else {
             ppns = await Ppn.findAll({
@@ -107,7 +106,7 @@ const getAllPpn = async (req, res) => {
                     model: Employe,
                     as: 'ppns_employe'
                 }],
-                order: [['id_ppn', 'DESC']]
+                order: [['nom_ppn', 'ASC']]
             });
         }
 

@@ -1,23 +1,29 @@
 'use client';
 
 import React from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import '../styles/sidebar.css'
 
-function Sidebar({ activePage, onNavigate, user, onLogout, onThemeToggle, theme }) {
+function Sidebar({ currentPath, user, onLogout, onThemeToggle, theme }) {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const activePage = location.pathname.split('/').pop(); // Declare activePage variable
+
   const adminNavItems = [
-    { id: 'admin-dashboard', label: 'Tableau de bord', icon: '📊' },
-    { id: 'account-validation', label: 'Validation modérateurs', icon: '👥' },
-    { id: 'ppn-management', label: 'Gestion PPN', icon: '📦' },
-    { id: 'analytics', label: 'Analytiques', icon: '📈' },
+    { path: '/dashboard', label: 'Tableau de bord', icon: '📊' },
+    { path: '/dashboard/account-validation', label: 'Validation modérateurs', icon: '👥' },
+    { path: '/dashboard/ppn-management', label: 'Gestion PPN', icon: '📦' },
+    { path: '/dashboard/analytics', label: 'Analytiques', icon: '📈' },
   ]
 
   const regionalNavItems = [
-    { id: 'regional-dashboard', label: 'Tableau de bord', icon: '📊' },
-    { id: 'regional-reports', label: 'Rapports de prix', icon: '📋' },
-    { id: 'add-report', label: 'Nouveau rapport', icon: '➕' },
+    { path: '/dashboard', label: 'Tableau de bord', icon: '📊' },
+    { path: '/dashboard/regional-reports', label: 'Rapports de prix', icon: '📋' },
+    { path: '/dashboard/add-report', label: 'Nouveau rapport', icon: '➕' },
   ]
 
-  const navItems = user.fonction === 'ADMINISTRATEUR' ? adminNavItems : regionalNavItems
+  const navItems = user?.fonction === 'ADMINISTRATEUR' ? adminNavItems : regionalNavItems
+  const onNavigate = (path) => navigate(path); // Declare onNavigate function
 
   return (
     <aside className="sidebar">
@@ -36,9 +42,9 @@ function Sidebar({ activePage, onNavigate, user, onLogout, onThemeToggle, theme 
           <p className="sidebar-section-title">Navigation</p>
           {navItems.map(item => (
             <button
-              key={item.id}
-              className={`sidebar-nav-item ${activePage === item.id ? 'active' : ''}`}
-              onClick={() => onNavigate(item.id)}
+              key={item.path}
+              className={`sidebar-nav-item ${location.pathname === item.path ? 'active' : ''}`}
+              onClick={() => navigate(item.path)}
             >
               <span className="sidebar-nav-item-icon">{item.icon}</span>
               <span>{item.label}</span>
@@ -49,8 +55,8 @@ function Sidebar({ activePage, onNavigate, user, onLogout, onThemeToggle, theme 
         <div className="sidebar-section">
           <p className="sidebar-section-title">Parametres</p>
           <button
-            className={`sidebar-nav-item ${activePage === 'profile' ? 'active' : ''}`}
-            onClick={() => onNavigate('profile')}
+            className={`sidebar-nav-item ${location.pathname === '/dashboard/profile' ? 'active' : ''}`}
+            onClick={() => navigate('/dashboard/profile')}
           >
             <span className="sidebar-nav-item-icon">👤</span>
             <span>Mon profil</span>

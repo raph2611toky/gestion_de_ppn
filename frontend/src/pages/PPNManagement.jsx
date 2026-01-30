@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import api from '../utils/api'
 import { useNotification } from '../components/Notifications'
+import PPNFormComponent from '../components/PPNForm'
 import '../styles/ppn-management.css'
 
 function PPNManagement() {
@@ -25,7 +26,7 @@ function PPNManagement() {
   const { success: showSuccess, error: showError } = useNotification()
   const itemsPerPage = 10
 
-  const unitOptions = ['KG', 'GRAMME', 'LITRE', 'SAC', 'KP']
+  const unitOptions = ['KG', 'GRAMME', 'LITRE', 'SAC', 'KP', 'Bouteille - 1L', 'Bouteille - 50Cl', 'Bouteille - 1.5L', 'Carton', 'Bidon - 20L', 'Bidon - 200L', ]
 
   // Charger la liste des PPNs
   useEffect(() => {
@@ -36,10 +37,10 @@ function PPNManagement() {
     setIsLoading(true)
     try {
       const response = await api.get('/ppns')
-      console.log('[v0] PPNs loaded:', response.data)
+      console.log('[+] PPNs loaded:', response.data)
       setPpns(response.data)
     } catch (err) {
-      console.log('[v0] Erreur lors du chargement des PPNs:', err.message)
+      console.log('[+] Erreur lors du chargement des PPNs:', err.message)
       showError('Impossible de charger la liste des PPNs')
     } finally {
       setIsLoading(false)
@@ -66,13 +67,13 @@ function PPNManagement() {
     setIsSubmitting(true)
     try {
       const response = await api.post('/ppns', formData)
-      console.log('[v0] PPN created:', response.data)
+      console.log('[+] PPN created:', response.data)
       setPpns([...ppns, response.data])
       showSuccess('Produit PPN ajouté avec succès')
       setShowAddModal(false)
       setFormData({ nom_ppn: '', description: '', unite_mesure_unitaire: '', unite_mesure_gros: '', observation: '' })
     } catch (err) {
-      console.log('[v0] Erreur lors de la création:', err.message)
+      console.log('[+] Erreur lors de la création:', err.message)
       if (err.response?.data?.message) {
         showError(err.response.data.message)
       } else {
@@ -89,13 +90,13 @@ function PPNManagement() {
     setIsSubmitting(true)
     try {
       await api.delete(`/ppns/${selectedPPN.id_ppn}`)
-      console.log('[v0] PPN deleted:', selectedPPN.id_ppn)
+      console.log('[+] PPN deleted:', selectedPPN.id_ppn)
       setPpns(ppns.filter(p => p.id_ppn !== selectedPPN.id_ppn))
       showSuccess('Produit PPN supprimé avec succès')
       setShowDeleteConfirm(false)
       setSelectedPPN(null)
     } catch (err) {
-      console.log('[v0] Erreur lors de la suppression:', err.message)
+      console.log('[+] Erreur lors de la suppression:', err.message)
       showError('Erreur lors de la suppression du PPN')
     } finally {
       setIsSubmitting(false)
@@ -128,7 +129,7 @@ function PPNManagement() {
     setIsSubmitting(true)
     try {
       const response = await api.put(`/ppns/${selectedPPN.id_ppn}`, formData)
-      console.log('[v0] PPN updated:', response.data)
+      console.log('[+] PPN updated:', response.data)
       const updatedPpns = ppns.map(p => p.id_ppn === selectedPPN.id_ppn ? response.data : p)
       setPpns(updatedPpns)
       showSuccess('Produit PPN modifié avec succès')
@@ -136,7 +137,7 @@ function PPNManagement() {
       setSelectedPPN(null)
       setFormData({ nom_ppn: '', description: '', unite_mesure_unitaire: '', unite_mesure_gros: '', observation: '' })
     } catch (err) {
-      console.log('[v0] Erreur lors de la modification:', err.message)
+      console.log('[+] Erreur lors de la modification:', err.message)
       if (err.response?.data?.message) {
         showError(err.response.data.message)
       } else {
@@ -150,74 +151,26 @@ function PPNManagement() {
   const handleViewDetail = async (id_ppn) => {
     try {
       const response = await api.get(`/ppns/${id_ppn}`)
-      console.log('[v0] PPN detail loaded:', response.data)
+      console.log('[+] PPN detail loaded:', response.data)
       setSelectedPPN(response.data)
     } catch (err) {
-      console.log('[v0] Erreur lors du chargement du détail:', err.message)
+      console.log('[+] Erreur lors du chargement du détail:', err.message)
       showError('Impossible de charger les détails du PPN')
     }
   }
 
-  const PPNForm = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      <div className="form-group" style={{ marginBottom: 0 }}>
-        <label className="form-label">Nom du produit *</label>
-        <input
-          type="text"
-          className="form-input"
-          placeholder="Ex: Riz blanc local"
-          value={formData.nom_ppn}
-          onChange={(e) => setFormData({ ...formData, nom_ppn: e.target.value })}
-        />
-      </div>
-      <div className="form-group" style={{ marginBottom: 0 }}>
-        <label className="form-label">Description</label>
-        <textarea
-          className="form-input"
-          placeholder="Description détaillée du PPN"
-          value={formData.description}
-          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-          rows="3"
-        />
-      </div>
-      <div className="form-group" style={{ marginBottom: 0 }}>
-        <label className="form-label">Unité de mesure (unitaire)</label>
-        <select
-          className="form-select"
-          value={formData.unite_mesure_unitaire}
-          onChange={(e) => setFormData({ ...formData, unite_mesure_unitaire: e.target.value })}
-        >
-          <option value="">Sélectionner</option>
-          {unitOptions.map(unit => (
-            <option key={unit} value={unit}>{unit}</option>
-          ))}
-        </select>
-      </div>
-      <div className="form-group" style={{ marginBottom: 0 }}>
-        <label className="form-label">Unité de mesure (gros)</label>
-        <select
-          className="form-select"
-          value={formData.unite_mesure_gros}
-          onChange={(e) => setFormData({ ...formData, unite_mesure_gros: e.target.value })}
-        >
-          <option value="">Sélectionner</option>
-          {unitOptions.map(unit => (
-            <option key={unit} value={unit}>{unit}</option>
-          ))}
-        </select>
-      </div>
-      <div className="form-group" style={{ marginBottom: 0 }}>
-        <label className="form-label">Observation</label>
-        <input
-          type="text"
-          className="form-input"
-          placeholder="Ex: Produit saisonnier"
-          value={formData.observation}
-          onChange={(e) => setFormData({ ...formData, observation: e.target.value })}
-        />
-      </div>
-    </div>
-  )
+  const handleFormChange = useCallback((field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }))
+  }, [])
+
+  const handleAddClick = useCallback(() => {
+    setShowAddModal(true)
+  }, [])
+
+  const handleCloseAddModal = useCallback(() => {
+    setShowAddModal(false)
+    setFormData({ nom_ppn: '', description: '', unite_mesure_unitaire: '', unite_mesure_gros: '', observation: '' })
+  }, [])
 
   // Vue détail d'un PPN
   if (selectedPPN && selectedPPN.id_ppn) {
@@ -311,7 +264,7 @@ function PPNManagement() {
           </h2>
           <button
             className="btn btn-primary"
-            onClick={() => setShowAddModal(true)}
+            onClick={handleAddClick}
           >
             + Ajouter un PPN
           </button>
@@ -413,7 +366,7 @@ function PPNManagement() {
 
       {/* Add Modal */}
       {showAddModal && (
-        <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
+        <div className="modal-overlay" onClick={handleCloseAddModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3 className="modal-title">
@@ -422,18 +375,18 @@ function PPNManagement() {
               </h3>
               <button
                 className="modal-close"
-                onClick={() => setShowAddModal(false)}
+                onClick={handleCloseAddModal}
               >
                 ✕
               </button>
             </div>
             <div className="modal-body">
-              <PPNForm />
+              <PPNFormComponent formData={formData} onFormChange={handleFormChange} unitOptions={unitOptions} />
             </div>
             <div className="modal-footer">
               <button
                 className="modal-btn modal-btn-secondary"
-                onClick={() => setShowAddModal(false)}
+                onClick={handleCloseAddModal}
               >
                 Annuler
               </button>
@@ -463,7 +416,7 @@ function PPNManagement() {
               </button>
             </div>
             <div className="modal-body">
-              <p>Êtes-vous sûr de vouloir supprimer <strong>{selectedppn.nom_ppn}</strong> ? Cette action est irréversible.</p>
+              <p>Êtes-vous sûr de vouloir supprimer <strong>{selectedPPN.nom_ppn}</strong> ? Cette action est irréversible.</p>
             </div>
             <div className="modal-footer">
               <button

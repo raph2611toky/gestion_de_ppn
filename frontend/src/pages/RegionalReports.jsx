@@ -1,26 +1,197 @@
 'use client';
 
-import React, { useState } from 'react'
-import { useAuth } from '../contexts/AuthContext.jsx'
-import { useData } from '../contexts/DataContext.jsx'
-import { useNotification } from '../components/Notifications.jsx'
-import { generateRegionReportPDF } from '../utils/pdfGenerator.js'
+import React, { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
+import api from '../utils/api'
+import { useAuth } from '../contexts/AuthContext'
+import { useNotification } from '../components/Notifications'
+import { generateRegionReportPDF } from '../utils/pdfGenerator'
 
-function RegionalReports({ onNavigate }) {
+function RegionalReports() {
+  const navigate = useNavigate()
   const { user } = useAuth()
-  const { priceReports, ppnList } = useData()
-  const { showNotification } = useNotification()
+  const { success: showSuccess, error: showError } = useNotification()
+  const [rapports, setRapports] = useState([])
+  const [ppns, setPpns] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
   const [filterPPN, setFilterPPN] = useState('')
   const [filterMonth, setFilterMonth] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [selectedRapport, setSelectedRapport] = useState(null)
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false) // Declare setIsSubmitting variable
+  const itemsPerPage = 10
 
-  const myReports = priceReports.filter(r => r.region === user?.region)
+  // Charger mes rapports
+  const fetchMyRapports = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const response = await api.get('/rapports/my')
+      console.log('[v0] Mes rapports chargés:', response.data)
+      setRapports(response.data)
+    } catch (err) {
+      console.log('[v0] Erreur lors du chargement des rapports:', err.message)
+      showError('Impossible de charger les rapports')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [showError])
 
-  const filteredReports = myReports.filter(report => {
-    const matchesPPN = !filterPPN || report.ppnId === filterPPN
-    const matchesMonth = !filterMonth || report.date.startsWith(filterMonth)
+  // Charger les PPNs
+  const fetchPpns = useCallback(async () => {
+    try {
+      const response = await api.get('/ppns')
+      setPpns(response.data)
+    } catch (err) {
+      console.log('[v0] Erreur lors du chargement des PPNs:', err.message)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchMyRapports()
+    fetchPpns()
+  }, [fetchMyRapports, fetchPpns])
+
+  const filteredReports = rapports.filter(rapport => {
+    const matchesPPN = !filterPPN || rapport.ppn_id === parseInt(filterPPN)
+    const matchesMonth = !filterMonth || rapport.date.startsWith(filterMonth)
     return matchesPPN && matchesMonth
   })
+
+  const totalPages = Math.ceil(filteredReports.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedReports = filteredReports.slice(startIndex, endIndex)
+
+  const handleDeleteRapport = async () => {
+    if (!selectedRapport) return
+    
+    setIsSubmitting(true)
+    try {
+      await api.delete(`/rapports/${selectedRapport.idrapport}`)
+      console.log('[v0] Rapport supprimé:', selectedRapport.idrapport)
+      setRapports(rapports.filter(r => r.idrapport !== selectedRapport.idrapport))
+      showSuccess('Rapport supprimé avec succès')
+      setShowDeleteConfirm(false)
+      setSelectedRapport(null)
+    } catch (err) {
+      console.log('[v0] Erreur lors de la suppression:', err.message)
+      if (err.response?.status === 403) {
+        showError('Vous ne pouvez supprimer que vos propres rapports')
+      } else {
+        showError('Erreur lors de la suppression du rapport')
+      }
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleEditRapport = (rapport) => {
+    navigate('/dashboard/add-report', { state: { rapport } })
+  }
+
+  if (selectedRapport && selectedRapport.idrapport) {
+    return (
+      <div className="animate-fade-in">
+        <div className="section-card">
+          <button 
+            className="btn btn-secondary"
+            onClick={() => setSelectedRapport(null)}
+            style={{ marginBottom: '1rem' }}
+          >
+            ← Retour à la liste
+          </button>
+          
+          <div className="section-header">
+            <h2 className="section-title">
+              <span>📋</span>
+              {selectedRapport.ppn?.nomppn || 'Rapport'}
+            </h2>
+          </div>
+
+          <div className="section-body">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+              <div>
+                <h3 style={{ marginBottom: '1rem', fontWeight: 600 }}>Détails du rapport</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div>
+                    <label style={{ fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>Produit:</label>
+                    <p>{selectedRapport.ppn?.nomppn}</p>
+                  </div>
+                  <div>
+                    <label style={{ fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>Prix unitaire (min - max):</label>
+                    <p>{selectedRapport.prix_unitaire_min} - {selectedRapport.prix_unitaire_max} Ar</p>
+                  </div>
+                  <div>
+                    <label style={{ fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>Prix gros (min - max):</label>
+                    <p>{selectedRapport.prix_gros_min} - {selectedRapport.prix_gros_max} Ar</p>
+                  </div>
+                  <div>
+                    <label style={{ fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>District:</label>
+                    <p>{selectedRapport.district}</p>
+                  </div>
+                  <div>
+                    <label style={{ fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>Observation:</label>
+                    <p>{selectedRapport.observation || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label style={{ fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>Date:</label>
+                    <p>{new Date(selectedRapport.date).toLocaleDateString('fr-FR')}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <button 
+                    className="btn btn-primary" 
+                    onClick={() => handleEditRapport(selectedRapport)}
+                  >
+                    Modifier
+                  </button>
+                  <button 
+                    className="btn btn-danger"
+                    onClick={() => {
+                      setShowDeleteConfirm(true)
+                    }}
+                  >
+                    Supprimer
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {showDeleteConfirm && (
+          <div className="modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3 className="modal-title">Supprimer le rapport</h3>
+                <button className="modal-close" onClick={() => setShowDeleteConfirm(false)}>✕</button>
+              </div>
+              <div className="modal-body">
+                <p>Êtes-vous sûr de vouloir supprimer ce rapport ? Cette action est irréversible.</p>
+              </div>
+              <div className="modal-footer">
+                <button className="modal-btn modal-btn-secondary" onClick={() => setShowDeleteConfirm(false)}>
+                  Annuler
+                </button>
+                <button 
+                  className="modal-btn modal-btn-danger"
+                  onClick={handleDeleteRapport}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Suppression...' : 'Supprimer'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="animate-fade-in">
@@ -34,8 +205,8 @@ function RegionalReports({ onNavigate }) {
             onChange={(e) => setFilterPPN(e.target.value)}
           >
             <option value="">Tous les produits</option>
-            {ppnList.map(ppn => (
-              <option key={ppn.id} value={ppn.id}>{ppn.name}</option>
+            {ppns.map(ppn => (
+              <option key={ppn.id_ppn} value={ppn.id_ppn}>{ppn.nom_ppn}</option>
             ))}
           </select>
         </div>
@@ -52,24 +223,8 @@ function RegionalReports({ onNavigate }) {
 
         <div className="filter-actions">
           <button
-            className="btn btn-secondary"
-            onClick={async () => {
-              setIsGeneratingPDF(true)
-              try {
-                await generateRegionReportPDF(user?.region, filteredReports, ppnList)
-                showNotification('success', 'PDF genere avec succes')
-              } catch (error) {
-                showNotification('error', 'Erreur lors de la generation du PDF')
-              }
-              setIsGeneratingPDF(false)
-            }}
-            disabled={isGeneratingPDF || filteredReports.length === 0}
-          >
-            {isGeneratingPDF ? 'Generation...' : 'Telecharger PDF'}
-          </button>
-          <button
             className="btn btn-primary"
-            onClick={() => onNavigate('add-report')}
+            onClick={() => navigate('/dashboard/add-report')}
           >
             + Nouveau rapport
           </button>
@@ -85,7 +240,9 @@ function RegionalReports({ onNavigate }) {
           </h2>
         </div>
         <div className="section-body no-padding">
-          {filteredReports.length > 0 ? (
+          {isLoading ? (
+            <div style={{ padding: '2rem', textAlign: 'center' }}>Chargement...</div>
+          ) : paginatedReports.length > 0 ? (
             <div className="table-container">
               <div style={{ overflowX: 'auto' }}>
                 <table className="table">
@@ -98,18 +255,27 @@ function RegionalReports({ onNavigate }) {
                       <th>Prix Gros Max</th>
                       <th>District</th>
                       <th>Date</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredReports.map(report => (
-                      <tr key={report.id}>
-                        <td style={{ fontWeight: 500 }}>{report.ppnName}</td>
-                        <td>{report.prix_unitaire_min?.toLocaleString('fr-FR') || '0'} Ar</td>
-                        <td>{report.prix_unitaire_max?.toLocaleString('fr-FR') || '0'} Ar</td>
-                        <td>{report.prix_gros_min?.toLocaleString('fr-FR') || '0'} Ar</td>
-                        <td>{report.prix_gros_max?.toLocaleString('fr-FR') || '0'} Ar</td>
-                        <td>{report.district}</td>
-                        <td>{new Date(report.date).toLocaleDateString('fr-FR')}</td>
+                    {paginatedReports.map(rapport => (
+                      <tr key={rapport.idrapport}>
+                        <td style={{ fontWeight: 500 }}>{rapport.ppn?.nom_ppn}</td>
+                        <td>{rapport.prix_unitaire_min}</td>
+                        <td>{rapport.prix_unitaire_max}</td>
+                        <td>{rapport.prix_gros_min}</td>
+                        <td>{rapport.prix_gros_max}</td>
+                        <td>{rapport.district}</td>
+                        <td>{new Date(rapport.date).toLocaleDateString('fr-FR')}</td>
+                        <td>
+                          <button
+                            className="action-btn action-btn-edit"
+                            onClick={() => setSelectedRapport(rapport)}
+                          >
+                            Voir
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -119,10 +285,34 @@ function RegionalReports({ onNavigate }) {
           ) : (
             <div className="empty-state">
               <div className="empty-state-icon">📋</div>
-              <p>Aucun rapport trouve</p>
+              <p>Aucun rapport trouvé</p>
             </div>
           )}
         </div>
+
+        {totalPages > 1 && (
+          <div className="section-body" style={{ borderTop: '1px solid var(--border-color)' }}>
+            <div className="pagination">
+              <button
+                className="pagination-btn"
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+              >
+                Précédent
+              </button>
+              <span className="pagination-info">
+                Page {currentPage} sur {totalPages}
+              </span>
+              <button
+                className="pagination-btn"
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+              >
+                Suivant
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

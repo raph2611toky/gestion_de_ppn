@@ -27,7 +27,7 @@ export function AuthProvider({ children }) {
       try {
         setUser(JSON.parse(storedUser))
       } catch (err) {
-        console.log('[v0] Erreur parsing user data:', err)
+        console.log('[+] Erreur parsing user data:', err)
         logout()
       }
     }
@@ -61,7 +61,7 @@ export function AuthProvider({ children }) {
       }
       return null
     } catch (err) {
-      console.log('[v0] Erreur lors de la récupération du profil:', err.message)
+      console.log('[+] Erreur lors de la récupération du profil:', err.message)
       let errorMessage = 'Erreur lors de la récupération du profil'
       
       if (err.response?.status === 401) {
@@ -91,12 +91,12 @@ export function AuthProvider({ children }) {
       if (token) {
         // Sauvegarder le token (localStorage.setItem n'est pas async)
         localStorage.setItem('token', token)
-        console.log('[v0] Token sauvegardé, appel getProfile...')
+        console.log('[+] Token sauvegardé, appel getProfile...')
         return true
       }
       return false
     } catch (err) {
-      console.log('[v0] Erreur de connexion:', err.message)
+      console.log('[+] Erreur de connexion:', err.message)
       let errorMessage = 'Une erreur est survenue lors de la connexion'
       
       if (err.response?.status === 401) {
@@ -115,7 +115,7 @@ export function AuthProvider({ children }) {
       // Envoyer la demande de logout au serveur avec le token
       await api.put('/logout', {})
     } catch (err) {
-      console.log('[v0] Erreur lors du logout API:', err.message)
+      console.log('[+] Erreur lors du logout API:', err.message)
       // Continuer le logout local même si l'API échoue
     } finally {
       localStorage.removeItem('token')

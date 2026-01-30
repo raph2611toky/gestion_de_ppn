@@ -1,20 +1,32 @@
 'use client';
 
 import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useNotification } from '../components/Notifications'
 import '../styles/login.css'
 
-function Login({ onThemeToggle, theme, onRegister }) {
+function Login({ onThemeToggle, theme }) {
+  const navigate = useNavigate()
   const [portal, setPortal] = useState('admin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [username, setUsername] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const { login, getProfile } = useAuth()
-  const { showNotification } = useNotification()
+  const { success: showSuccess, error: showError } = useNotification()
+  const showNotification = (type, message) => {
+    if (type === 'success') {
+      showSuccess(message);
+    } else if (type === 'error') {
+      showError(message);
+    }
+  };
+
+  const onRegister = () => {
+    navigate('/register');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -32,30 +44,30 @@ function Login({ onThemeToggle, theme, onRegister }) {
       const loginSuccess = await login(email, password, portal)
 
       if (loginSuccess) {
-        console.log('[v0] Connexion réussie, token sauvegardé')
+        console.log('[+] Connexion réussie, token sauvegardé')
         
         // Récupérer le profil complet avec le token envoyé dans l'en-tête
         const profileData = await getProfile()
         
         if (profileData) {
-          console.log('[v0] Profil récupéré:', profileData)
-          // Afficher une notification de succès
-          showNotification('success', 'Connexion réussie!')
-          
+          console.log('[+] Profil récupéré:', profileData)
+          showSuccess('Connexion réussie! Redirection...')
+          setTimeout(() => {
+            navigate('/dashboard')
+          }, 500)
         } else {
           setError('Erreur lors de la récupération du profil')
-          showNotification('error', 'Erreur lors de la récupération du profil')
+          showError('Erreur lors de la récupération du profil')
         }
       } else {
-        // La méthode login a échoué
         setError('Identifiants incorrects')
-        showNotification('error', 'Identifiants incorrects')
+        showError('Identifiants incorrects')
       }
     } catch (err) {
-      console.log('[v0] Erreur de connexion:', err.message)
+      console.log('[+] Erreur de connexion:', err.message)
       const errorMsg = 'Une erreur est survenue lors de la connexion'
       setError(errorMsg)
-      showNotification('error', errorMsg)
+      showError(errorMsg)
     } finally {
       setIsLoading(false)
     }
@@ -160,7 +172,7 @@ function Login({ onThemeToggle, theme, onRegister }) {
         <div className="login-footer">
           <p className="login-footer-text">
             Pas encore de compte ?{' '}
-            <button className="login-footer-link" onClick={onRegister} disabled={isLoading}>
+            <button className="login-footer-link" onClick={() => navigate('/register')} disabled={isLoading}>
               Demander un acces
             </button>
           </p>

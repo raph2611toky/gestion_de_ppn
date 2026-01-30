@@ -1,15 +1,45 @@
 'use client';
 
-import React from 'react'
-import { useAuth } from '../contexts/AuthContext.jsx'
-import { useData } from '../contexts/DataContext.jsx'
+import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import api from '../utils/api'
+import { useAuth } from '../contexts/AuthContext'
+import { useNotification } from '../components/Notifications'
 
-function RegionalDashboard({ onNavigate }) {
+function RegionalDashboard() {
+  const navigate = useNavigate()
   const { user } = useAuth()
-  const { priceReports, ppnList } = useData()
+  const { error: showError } = useNotification()
   
-  const myReports = priceReports.filter(r => r.region === user?.region)
-  const thisMonthReports = myReports.filter(r => {
+  const [rapports, setRapports] = useState([])
+  const [ppns, setPpns] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  const myReports = rapports; // Declare myReports variable
+  const ppnList = ppns; // Declare ppnList variable
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true)
+      try {
+        const [rapportsRes, ppnsRes] = await Promise.all([
+          api.get('/rapports/my'),
+          api.get('/ppns')
+        ])
+        setRapports(rapportsRes.data)
+        setPpns(ppnsRes.data)
+      } catch (err) {
+        console.log('[v0] Erreur lors du chargement des données:', err.message)
+        showError('Impossible de charger les données')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    
+    fetchData()
+  }, [showError])
+
+  const thisMonthReports = rapports.filter(r => {
     const reportDate = new Date(r.date)
     const now = new Date()
     return reportDate.getMonth() === now.getMonth() && reportDate.getFullYear() === now.getFullYear()
@@ -17,15 +47,15 @@ function RegionalDashboard({ onNavigate }) {
 
   const stats = [
     { 
-      id: 'regional-reports',
+      id: 'my-reports',
       label: 'Mes rapports', 
-      value: myReports.length, 
+      value: rapports.length, 
       icon: '📋', 
       color: '#2563eb',
       bgColor: '#dbeafe'
     },
     { 
-      id: 'add-report',
+      id: 'this-month',
       label: 'Ce mois', 
       value: thisMonthReports.length, 
       icon: '📅', 
@@ -33,18 +63,38 @@ function RegionalDashboard({ onNavigate }) {
       bgColor: '#d1fae5'
     },
     { 
-      id: 'add-report',
+      id: 'ppns',
       label: 'Produits PPN', 
-      value: ppnList.length, 
+      value: ppns.length, 
       icon: '📦', 
       color: '#f59e0b',
       bgColor: '#fef3c7'
     },
   ]
 
-  const recentReports = [...myReports]
+  const recentReports = [...rapports]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 5)
+
+  const handleStatClick = (id) => {
+    switch (id) {
+      case 'my-reports':
+        navigate('/dashboard/regional-reports')
+        break
+      case 'this-month':
+        navigate('/dashboard/regional-reports')
+        break
+      case 'ppns':
+        navigate('/dashboard/ppn-management')
+        break
+      default:
+        break
+    }
+  }
+
+  const onNavigate = (id) => {
+    handleStatClick(id)
+  }
 
   return (
     <div className="animate-fade-in">
@@ -53,7 +103,8 @@ function RegionalDashboard({ onNavigate }) {
           <div
             key={stat.id + index}
             className="stat-card"
-            onClick={() => onNavigate(stat.id)}
+            onClick={() => handleStatClick(stat.id)}
+            style={{ cursor: 'pointer' }}
           >
             <div 
               className="stat-card-icon"
@@ -76,30 +127,34 @@ function RegionalDashboard({ onNavigate }) {
           </h2>
           <button
             className="btn btn-primary"
-            onClick={() => onNavigate('add-report')}
+            onClick={() => navigate('/dashboard/add-report')}
           >
             + Nouveau rapport
           </button>
         </div>
         <div className="section-body no-padding">
-          {recentReports.length > 0 ? (
+          {isLoading ? (
+            <div style={{ padding: '2rem', textAlign: 'center' }}>Chargement...</div>
+          ) : recentReports.length > 0 ? (
             <div className="table-container">
               <table className="table">
                 <thead>
                   <tr>
                     <th>Produit</th>
-                    <th>Prix</th>
+                    <th>Prix unitaire</th>
+                    <th>Prix gros</th>
                     <th>District</th>
                     <th>Date</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {recentReports.map(report => (
-                    <tr key={report.id}>
-                      <td>{report.ppnName}</td>
-                      <td style={{ fontWeight: 600 }}>{report.price.toLocaleString()} Ar</td>
-                      <td>{report.district}</td>
-                      <td>{new Date(report.date).toLocaleDateString('fr-FR')}</td>
+                  {recentReports.map(rapport => (
+                    <tr key={rapport.idrapport}>
+                      <td style={{ fontWeight: 500 }}>{rapport.ppn?.nomppn}</td>
+                      <td>{rapport.prixunitairemin} - {rapport.prixunitairemax}</td>
+                      <td>{rapport.prixgrosmin} - {rapport.prixgrosmax}</td>
+                      <td>{rapport.district}</td>
+                      <td>{new Date(rapport.date).toLocaleDateString('fr-FR')}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -111,10 +166,10 @@ function RegionalDashboard({ onNavigate }) {
               <p>Aucun rapport pour le moment</p>
               <button
                 className="btn btn-primary"
-                onClick={() => onNavigate('add-report')}
+                onClick={() => navigate('/dashboard/add-report')}
                 style={{ marginTop: '1rem' }}
               >
-                Creer mon premier rapport
+                Créer mon premier rapport
               </button>
             </div>
           )}

@@ -202,6 +202,7 @@ const addRapport = async (req, res) => {
     try {
         const { ppn_id, prix_unitaire_min, prix_unitaire_max, prix_gros_min, prix_gros_max, district, observation, date } = req.body;
         const employe_id = req.employe.id_employe;
+        console.log(req.body);
 
         // Validate required fields
         if (!ppn_id || !prix_unitaire_min || !prix_unitaire_max || !prix_gros_min || !prix_gros_max || !district) {
@@ -576,6 +577,87 @@ const getDashboard = async (req, res) => {
     }
 };
 
+// 9 - Moderator Dashboard (regional)
+const getModeratorDashboard = async (req, res) => {
+  try {
+    // Access: MODERATEUR only
+    if (!req.employe || req.employe.fonction !== 'MODERATEUR') {
+      return Helper.send_res(res, { erreur: 'Accès réservé aux modérateurs.' }, 403);
+    }
+
+    // Moderator profile => region comes from Moderateur table
+    const moderateur = await db.Moderateur.findOne({
+      where: { employe_id: req.employe.id_employe },
+    });
+
+    if (!moderateur) {
+      return Helper.send_res(res, { erreur: 'Profil modérateur introuvable.' }, 404);
+    }
+
+    const region = moderateur.region;
+
+    const ppns = await Ppn.findAll({ order: [['nom_ppn', 'ASC']] });
+
+    const regionsRows = await db.Moderateur.findAll({
+      attributes: ['region'],
+      group: ['region'],
+    });
+    const nombreRegions = regionsRows.length;
+
+    // 3) Rapports ce mois (dans la région du modérateur)
+    const startOfMonth = moment().startOf('month').toDate();
+    const endOfMonth = moment().endOf('month').toDate();
+
+    const rapportsThisMonth = await Rapport.count({
+      where: { date: { [Op.between]: [startOfMonth, endOfMonth] } },
+      include: [
+        { model: Employe, as: 'employe', where: { region }, required: true },
+      ],
+    });
+
+    // 4) Total rapports (dans la région du modérateur)
+    const totalRapports = await Rapport.count({
+      include: [
+        { model: Employe, as: 'employe', where: { region }, required: true },
+      ],
+    });
+
+    // (Optionnel) Derniers rapports de prix dans la région (avec tous champs prix)
+    const latest = await Rapport.findAll({
+      include: [
+        { model: Ppn, as: 'ppn' },
+        { model: Employe, as: 'employe', where: { region }, required: true },
+      ],
+      order: [['date', 'DESC']],
+      limit: 10,
+    });
+
+    return Helper.send_res(res, {
+      region,
+      stats: {
+        produitsPpn: ppns.length,
+        rapportsThisMonth,
+        totalRapports,
+        nombreRegions,
+      },
+      ppns: ppns.map((p) => ({
+        id_ppn: p.id_ppn,
+        nom_ppn: p.nom_ppn,
+        description: p.description,
+        unite_mesure_unitaire: p.unite_mesure_unitaire,
+        unite_mesure_gros: p.unite_mesure_gros,
+        observation: p.observation,
+        employe_id: p.employe_id,
+      })),
+      latestRapports: latest.map(formatRapport),
+    });
+  } catch (err) {
+    console.error(err);
+    return Helper.send_res(res, { erreur: 'Impossible de récupérer le dashboard modérateur.' }, 500);
+  }
+};
+
+
 module.exports = {
     getAllRapports,
     getMyRapports,
@@ -586,4 +668,5 @@ module.exports = {
     deleteRapport,
     getDashboard,
     getUsersWithRapports,
+    getModeratorDashboard
 };
