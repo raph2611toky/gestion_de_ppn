@@ -7,6 +7,7 @@ const moment = require('moment');
 const Rapport = db.Rapport;
 const Ppn = db.Ppn;
 const Employe = db.Employe;
+const Moderateur = db.Moderateur;
 
 // Format report data
 const formatRapport = (rapport) => ({
@@ -34,7 +35,7 @@ const formatRapport = (rapport) => ({
         cin: rapport.employe.cin,
         nom: rapport.employe.nom,
         email: rapport.employe.email,
-        region: rapport.employe.region,
+        region: rapport.employe?.moderateurDetails?.region,
         fonction: rapport.employe.fonction
     } : null
 });
@@ -105,9 +106,6 @@ const getUsersWithRapports = async (req, res) => {
 // 1 - List All Reports (Admin Only)
 const getAllRapports = async (req, res) => {
     try {
-        if (req.employe.fonction !== 'ADMINISTRATEUR') {
-            return Helper.send_res(res, { erreur: 'Accès réservé aux administrateurs.' }, 403);
-        }
         const rapports = await Rapport.findAll({
             include: [
                 { model: Ppn, as: 'ppn' },
@@ -342,303 +340,545 @@ const deleteRapport = async (req, res) => {
     }
 };
 
-// 8 - Admin Dashboard
-const getDashboard = async (req, res) => {
-    try {
-        if (req.employe.fonction !== 'ADMINISTRATEUR') {
-            return Helper.send_res(res, { erreur: 'Accès réservé aux administrateurs.' }, 403);
-        }
-
-        // Extract query parameters for filtering
-        const { start_date, end_date, ppn_id, district } = req.query;
-
-        // Build where clause for filtering
-        const whereClause = {};
-        if (start_date && end_date) {
-            const start = moment(start_date).startOf('day').toDate();
-            const end = moment(end_date).endOf('day').toDate();
-            if (!moment(start_date).isValid() || !moment(end_date).isValid()) {
-                return Helper.send_res(res, { erreur: 'Dates invalides.' }, 400);
-            }
-            whereClause.date = { [Op.between]: [start, end] };
-        }
-        if (ppn_id) {
-            whereClause.ppn_id = ppn_id;
-        }
-        if (district) {
-            whereClause.district = { [Op.like]: `%${district}%` };
-        }
-
-        const rapports = await Rapport.findAll({
-            where: whereClause,
-            include: [
-                { model: Ppn, as: 'ppn' },
-                { model: Employe, as: 'employe' }
-            ]
-        });
-
-        if (!rapports.length) {
-            return Helper.send_res(res, { message: 'Aucun rapport trouvé pour les filtres spécifiés.' }, 200);
-        }
-
-        // Parse prices and prepare data
-        const parsedRapports = rapports.map(r => ({
-            ...r.dataValues,
-            avg_prix_unitaire: (parseFloat(r.prix_unitaire_min) + parseFloat(r.prix_unitaire_max)) / 2,
-            avg_prix_gros: (parseFloat(r.prix_gros_min) + parseFloat(r.prix_gros_max)) / 2,
-            month: moment(r.date).format('YYYY-MM'),
-            year: moment(r.date).format('YYYY'),
-            day: moment(r.date).format('YYYY-MM-DD'),
-            region: r.employe?.region
-        }));
-
-        // Group data by various dimensions
-        const byMonth = {};
-        const byYear = {};
-        const byPpn = {};
-        const byEmploye = {};
-        const byDistrict = {};
-        const byRegion = {};
-        const priceChanges = {};
-
-        parsedRapports.forEach(r => {
-            const ppnKey = r.ppn?.nom_ppn || 'Unknown';
-            const empKey = r.employe?.nom || 'Unknown';
-            const regionKey = r.region || 'Unknown';
-
-            // By Month
-            if (!byMonth[r.month]) byMonth[r.month] = { total_prix_unitaire: 0, total_prix_gros: 0, count: 0, prices_unitaire: [] };
-            byMonth[r.month].total_prix_unitaire += r.avg_prix_unitaire;
-            byMonth[r.month].total_prix_gros += r.avg_prix_gros;
-            byMonth[r.month].count += 1;
-            byMonth[r.month].prices_unitaire.push(r.avg_prix_unitaire);
-
-            // By Year
-            if (!byYear[r.year]) byYear[r.year] = { total_prix_unitaire: 0, total_prix_gros: 0, count: 0 };
-            byYear[r.year].total_prix_unitaire += r.avg_prix_unitaire;
-            byYear[r.year].total_prix_gros += r.avg_prix_gros;
-            byYear[r.year].count += 1;
-
-            // By PPN
-            if (!byPpn[ppnKey]) byPpn[ppnKey] = { 
-                total_prix_unitaire: 0, 
-                total_prix_gros: 0, 
-                count: 0, 
-                prices_unitaire: [], 
-                prices_gros: [],
-                dates: []
-            };
-            byPpn[ppnKey].total_prix_unitaire += r.avg_prix_unitaire;
-            byPpn[ppnKey].total_prix_gros += r.avg_prix_gros;
-            byPpn[ppnKey].count += 1;
-            byPpn[ppnKey].prices_unitaire.push(r.avg_prix_unitaire);
-            byPpn[ppnKey].prices_gros.push(r.avg_prix_gros);
-            byPpn[ppnKey].dates.push(r.day);
-
-            // By Employe
-            if (!byEmploye[empKey]) byEmploye[empKey] = { total_prix_unitaire: 0, total_prix_gros: 0, count: 0 };
-            byEmploye[empKey].total_prix_unitaire += r.avg_prix_unitaire;
-            byEmploye[empKey].total_prix_gros += r.avg_prix_gros;
-            byEmploye[empKey].count += 1;
-
-            // By District
-            if (!byDistrict[r.district]) byDistrict[r.district] = { total_prix_unitaire: 0, total_prix_gros: 0, count: 0, prices_unitaire: [] };
-            byDistrict[r.district].total_prix_unitaire += r.avg_prix_unitaire;
-            byDistrict[r.district].total_prix_gros += r.avg_prix_gros;
-            byDistrict[r.district].count += 1;
-            byDistrict[r.district].prices_unitaire.push(r.avg_prix_unitaire);
-
-            // By Region
-            if (!byRegion[regionKey]) byRegion[regionKey] = { total_prix_unitaire: 0, total_prix_gros: 0, count: 0, prices_unitaire: [] };
-            byRegion[regionKey].total_prix_unitaire += r.avg_prix_unitaire;
-            byRegion[regionKey].total_prix_gros += r.avg_prix_gros;
-            byRegion[regionKey].count += 1;
-            byRegion[regionKey].prices_unitaire.push(r.avg_prix_unitaire);
-
-            // Track price changes for frequency
-            if (!priceChanges[ppnKey]) priceChanges[ppnKey] = [];
-            priceChanges[ppnKey].push({ date: r.day, price: r.avg_prix_unitaire });
-        });
-
-        // Calculate Statistics
-        const stats = {
-            total_rapports: parsedRapports.length,
-            avg_prix_unitaire: parsedRapports.length
-                ? (parsedRapports.reduce((sum, r) => sum + r.avg_prix_unitaire, 0) / parsedRapports.length).toFixed(2)
-                : "0.00",
-            avg_prix_gros: parsedRapports.length
-                ? (parsedRapports.reduce((sum, r) => sum + r.avg_prix_gros, 0) / parsedRapports.length).toFixed(2)
-                : "0.00",
-            max_prix_unitaire: Math.max(...parsedRapports.map(r => r.avg_prix_unitaire), 0).toFixed(2),
-            min_prix_unitaire: Math.min(...parsedRapports.filter(r => r.avg_prix_unitaire > 0).map(r => r.avg_prix_unitaire), Infinity).toFixed(2) || "0.00",
-            max_prix_gros: Math.max(...parsedRapports.map(r => r.avg_prix_gros), 0).toFixed(2),
-            min_prix_gros: Math.min(...parsedRapports.filter(r => r.avg_prix_gros > 0).map(r => r.avg_prix_gros), Infinity).toFixed(2) || "0.00",
-            by_month: Object.keys(byMonth).map(month => ({
-                month,
-                avg_prix_unitaire: (byMonth[month].total_prix_unitaire / byMonth[month].count).toFixed(2),
-                avg_prix_gros: (byMonth[month].total_prix_gros / byMonth[month].count).toFixed(2),
-                count: byMonth[month].count,
-                max_prix_unitaire: Math.max(...byMonth[month].prices_unitaire, 0).toFixed(2),
-                min_prix_unitaire: Math.min(...byMonth[month].prices_unitaire.filter(p => p > 0), Infinity).toFixed(2) || "0.00"
-            })).sort((a, b) => a.month.localeCompare(b.month)),
-            by_year: Object.keys(byYear).map(year => ({
-                year,
-                avg_prix_unitaire: (byYear[year].total_prix_unitaire / byYear[year].count).toFixed(2),
-                avg_prix_gros: (byYear[year].total_prix_gros / byYear[year].count).toFixed(2),
-                count: byYear[year].count
-            })).sort((a, b) => a.year.localeCompare(b.year)),
-            by_ppn: Object.keys(byPpn).map(nom_ppn => {
-                const prices = byPpn[nom_ppn].prices_unitaire;
-                const sortedChanges = priceChanges[nom_ppn]?.sort((a, b) => a.date.localeCompare(b.date)) || [];
-                let changeFrequency = 0;
-                if (sortedChanges.length > 1) {
-                    for (let i = 1; i < sortedChanges.length; i++) {
-                        if (sortedChanges[i].price !== sortedChanges[i - 1].price) {
-                            changeFrequency++;
-                        }
-                    }
-                }
-                return {
-                    nom_ppn: nom_ppn,
-                    avg_prix_unitaire: (byPpn[nom_ppn].total_prix_unitaire / byPpn[nom_ppn].count).toFixed(2),
-                    avg_prix_gros: (byPpn[nom_ppn].total_prix_gros / byPpn[nom_ppn].count).toFixed(2),
-                    max_prix_unitaire: Math.max(...prices, 0).toFixed(2),
-                    min_prix_unitaire: Math.min(...prices.filter(p => p > 0), Infinity).toFixed(2) || "0.00",
-                    max_prix_gros: Math.max(...byPpn[nom_ppn].prices_gros, 0).toFixed(2),
-                    min_prix_gros: Math.min(...byPpn[nom_ppn].prices_gros.filter(p => p > 0), Infinity).toFixed(2) || "0.00",
-                    count: byPpn[nom_ppn].count,
-                    price_evolution: byPpn[nom_ppn].dates.map((date, i) => ({
-                        date,
-                        avg_prix_unitaire: byPpn[nom_ppn].prices_unitaire[i].toFixed(2),
-                        avg_prix_gros: byPpn[nom_ppn].prices_gros[i].toFixed(2)
-                    })).sort((a, b) => a.date.localeCompare(b.date)),
-                    change_frequency: changeFrequency
-                };
-            }),
-            by_employe: Object.keys(byEmploye).map(nom => ({
-                nom,
-                avg_prix_unitaire: (byEmploye[nom].total_prix_unitaire / byEmploye[nom].count).toFixed(2),
-                avg_prix_gros: (byEmploye[nom].total_prix_gros / byEmploye[nom].count).toFixed(2),
-                count: byEmploye[nom].count
-            })),
-            by_district: Object.keys(byDistrict | {}).map(district => ({
-                district,
-                avg_prix_unitaire: (byDistrict[district].total_prix_unitaire / byDistrict[district].count).toFixed(2),
-                avg_prix_gros: (byDistrict[district].total_prix_gros / byDistrict[district].count).toFixed(2),
-                count: byDistrict[district].count,
-                max_prix_unitaire: Math.max(...byDistrict[district].prices_unitaire, 0).toFixed(2),
-                min_prix_unitaire: Math.min(...byDistrict[district].prices_unitaire.filter(p => p > 0), Infinity).toFixed(2) || "0.00"
-            })),
-            by_region: Object.keys(byRegion).map(region => ({
-                region,
-                avg_prix_unitaire: (byRegion[region].total_prix_unitaire / byRegion[region].count).toFixed(2),
-                avg_prix_gros: (byRegion[region].total_prix_gros / byRegion[region].count).toFixed(2),
-                count: byRegion[region].count,
-                max_prix_unitaire: Math.max(...byRegion[region].prices_unitaire, 0).toFixed(2),
-                min_prix_unitaire: Math.min(...byRegion[region].prices_unitaire.filter(p => p > 0), Infinity).toFixed(2) || "0.00"
-            }))
-        };
-
-        // Inflation and IPC for prix_unitaire
-        const monthlyPrices = stats.by_month;
-        stats.inflation = [];
-        for (let i = 1; i < monthlyPrices.length; i++) {
-            const prev = parseFloat(monthlyPrices[i - 1].avg_prix_unitaire);
-            const curr = parseFloat(monthlyPrices[i].avg_prix_unitaire);
-            const inflationRate = prev > 0 ? ((curr - prev) / prev * 100).toFixed(2) : "0.00";
-            stats.inflation.push({
-                month: monthlyPrices[i].month,
-                inflation_rate: inflationRate
-            });
-        }
-
-        // IPC: Baseline is first month
-        const basePrice = monthlyPrices[0] ? parseFloat(monthlyPrices[0].avg_prix_unitaire) : 1;
-        stats.ipc = monthlyPrices.map(m => ({
-            month: m.month,
-            ipc: basePrice > 0 ? ((parseFloat(m.avg_prix_unitaire) / basePrice) * 100).toFixed(2) : "100.00"
-        }));
-
-        // Most Expensive Month (highest avg_prix_unitaire)
-        const maxMonth = monthlyPrices.reduce((max, m) => parseFloat(m.avg_prix_unitaire) > parseFloat(max.avg_prix_unitaire) ? m : max, monthlyPrices[0] || {});
-        stats.most_expensive_month = maxMonth.month || null;
-
-        // Overall Price Evolution
-        stats.price_evolution = monthlyPrices.map(m => ({
-            month: m.month,
-            avg_prix_unitaire: m.avg_prix_unitaire,
-            avg_prix_gros: m.avg_prix_gros
-        }));
-
-        return Helper.send_res(res, stats);
-    } catch (err) {
-        console.error(err);
-        return Helper.send_res(res, { erreur: 'Impossible de récupérer le tableau de bord.' }, 500);
-    }
-};
-
-// 9 - Moderator Dashboard (regional)
-const getModeratorDashboard = async (req, res) => {
+// 8 - Admin Stats and Analytics
+const getStats = async (req, res) => {
   try {
-    // Access: MODERATEUR only
-    if (!req.employe || req.employe.fonction !== 'MODERATEUR') {
-      return Helper.send_res(res, { erreur: 'Accès réservé aux modérateurs.' }, 403);
+    if (!req.employe || req.employe.fonction !== 'ADMINISTRATEUR') {
+      return Helper.send_res(res, { erreur: 'Accès réservé aux administrateurs.' }, 403);
     }
 
-    // Moderator profile => region comes from Moderateur table
-    const moderateur = await db.Moderateur.findOne({
-      where: { employe_id: req.employe.id_employe },
+    const { start_date, end_date, ppn_id, district } = req.query;
+
+    const whereClause = {};
+    if (start_date && end_date) {
+      if (!moment(start_date).isValid() || !moment(end_date).isValid()) {
+        return Helper.send_res(res, { erreur: 'Dates invalides.' }, 400);
+      }
+      const start = moment(start_date).startOf('day').toDate();
+      const end = moment(end_date).endOf('day').toDate();
+      whereClause.date = { [Op.between]: [start, end] };
+    }
+    if (ppn_id) {
+      whereClause.ppnid = ppn_id;
+    }
+    if (district) {
+      whereClause.district = { [Op.like]: `%${district}%` };
+    }
+
+    const rapports = await Rapport.findAll({
+      where: whereClause,
+      include: [
+        { model: Ppn, as: 'ppn' },
+        { model: Employe, as: 'employe', include: [{ model: db.Moderateur, as: 'moderateurDetails' }] }
+      ],
+      order: [['date', 'ASC']]
     });
 
-    if (!moderateur) {
-      return Helper.send_res(res, { erreur: 'Profil modérateur introuvable.' }, 404);
+    if (!rapports.length) {
+      return Helper.send_res(res, { message: 'Aucun rapport trouvé pour les filtres spécifiés.' }, 200);
     }
 
-    const region = moderateur.region;
+    const safeNum = (v) => {
+      const n = parseFloat(v);
+      return Number.isFinite(n) ? n : 0;
+    };
+
+    const computeStatsFromReports = (reports) => {
+      const parsed = reports.map((r) => {
+        const prixUnMin = safeNum(r.prix_unitaire_min);
+        const prixUnMax = safeNum(r.prix_unitaire_max);
+        const prixGrMin = safeNum(r.prix_gros_min);
+        const prixGrMax = safeNum(r.prix_gros_max);
+
+        const avgPrixUnitaire = (prixUnMin + prixUnMax) / 2;
+        const avgPrixGros = (prixGrMin + prixGrMax) / 2;
+
+        const d = moment(r.date);
+        const month = d.format('YYYY-MM');
+        const year = d.format('YYYY');
+        const day = d.format('YYYY-MM-DD');
+
+        const region = r.employe?.moderateurDetails?.region || 'Unknown';
+        const ppnName = r.ppn?.nomppn || 'Unknown';
+        const empName = r.employe?.nom || 'Unknown';
+
+        return {
+          rapport: r,
+          avgPrixUnitaire,
+          avgPrixGros,
+          month,
+          year,
+          day,
+          region,
+          ppnName,
+          empName
+        };
+      });
+
+      const total = parsed.length;
+
+      const sumUn = parsed.reduce((s, x) => s + x.avgPrixUnitaire, 0);
+      const sumGr = parsed.reduce((s, x) => s + x.avgPrixGros, 0);
+
+      const maxUn = Math.max(...parsed.map((x) => x.avgPrixUnitaire), 0);
+      const maxGr = Math.max(...parsed.map((x) => x.avgPrixGros), 0);
+
+      const minUnArr = parsed.map((x) => x.avgPrixUnitaire).filter((v) => v > 0);
+      const minGrArr = parsed.map((x) => x.avgPrixGros).filter((v) => v > 0);
+
+      const minUn = minUnArr.length ? Math.min(...minUnArr) : 0;
+      const minGr = minGrArr.length ? Math.min(...minGrArr) : 0;
+
+      const byMonthMap = {};
+      const byYearMap = {};
+      const byDateMap = {};
+      const byDistrictMap = {};
+      const byEmployeMap = {};
+      const priceChangesByPpn = {};
+
+      parsed.forEach((x) => {
+        const m = x.month;
+        const y = x.year;
+        const d = x.day;
+        const dist = x.rapport.district || 'Unknown';
+        const emp = x.empName;
+
+        if (!byMonthMap[m]) byMonthMap[m] = { totalUn: 0, totalGr: 0, count: 0, un: [], gr: [], dates: [] };
+        byMonthMap[m].totalUn += x.avgPrixUnitaire;
+        byMonthMap[m].totalGr += x.avgPrixGros;
+        byMonthMap[m].count += 1;
+        byMonthMap[m].un.push(x.avgPrixUnitaire);
+        byMonthMap[m].gr.push(x.avgPrixGros);
+        byMonthMap[m].dates.push(d);
+
+        if (!byYearMap[y]) byYearMap[y] = { totalUn: 0, totalGr: 0, count: 0 };
+        byYearMap[y].totalUn += x.avgPrixUnitaire;
+        byYearMap[y].totalGr += x.avgPrixGros;
+        byYearMap[y].count += 1;
+
+        if (!byDateMap[d]) byDateMap[d] = { totalUn: 0, totalGr: 0, count: 0, rapports: [] };
+        byDateMap[d].totalUn += x.avgPrixUnitaire;
+        byDateMap[d].totalGr += x.avgPrixGros;
+        byDateMap[d].count += 1;
+        byDateMap[d].rapports.push(formatRapport(x.rapport));
+
+        if (!byDistrictMap[dist]) byDistrictMap[dist] = { totalUn: 0, totalGr: 0, count: 0, un: [], gr: [] };
+        byDistrictMap[dist].totalUn += x.avgPrixUnitaire;
+        byDistrictMap[dist].totalGr += x.avgPrixGros;
+        byDistrictMap[dist].count += 1;
+        byDistrictMap[dist].un.push(x.avgPrixUnitaire);
+        byDistrictMap[dist].gr.push(x.avgPrixGros);
+
+        if (!byEmployeMap[emp]) byEmployeMap[emp] = { totalUn: 0, totalGr: 0, count: 0 };
+        byEmployeMap[emp].totalUn += x.avgPrixUnitaire;
+        byEmployeMap[emp].totalGr += x.avgPrixGros;
+        byEmployeMap[emp].count += 1;
+
+        if (!priceChangesByPpn[x.ppnName]) priceChangesByPpn[x.ppnName] = [];
+        priceChangesByPpn[x.ppnName].push({ date: d, price: x.avgPrixUnitaire });
+      });
+
+      const by_month = Object.keys(byMonthMap)
+        .map((month) => {
+          const it = byMonthMap[month];
+          const avgU = it.count ? it.totalUn / it.count : 0;
+          const avgG = it.count ? it.totalGr / it.count : 0;
+          const maxU = Math.max(...it.un, 0);
+          const minUArr = it.un.filter((p) => p > 0);
+          const minU = minUArr.length ? Math.min(...minUArr) : 0;
+          const maxG = Math.max(...it.gr, 0);
+          const minGArr = it.gr.filter((p) => p > 0);
+          const minG = minGArr.length ? Math.min(...minGArr) : 0;
+          return {
+            month,
+            avg_prix_unitaire: avgU.toFixed(2),
+            avg_prix_gros: avgG.toFixed(2),
+            count: it.count,
+            max_prix_unitaire: maxU.toFixed(2),
+            min_prix_unitaire: minU.toFixed(2),
+            max_prix_gros: maxG.toFixed(2),
+            min_prix_gros: minG.toFixed(2)
+          };
+        })
+        .sort((a, b) => a.month.localeCompare(b.month));
+
+      const by_year = Object.keys(byYearMap)
+        .map((year) => {
+          const it = byYearMap[year];
+          const avgU = it.count ? it.totalUn / it.count : 0;
+          const avgG = it.count ? it.totalGr / it.count : 0;
+          return {
+            year,
+            avg_prix_unitaire: avgU.toFixed(2),
+            avg_prix_gros: avgG.toFixed(2),
+            count: it.count
+          };
+        })
+        .sort((a, b) => a.year.localeCompare(b.year));
+
+      const by_date = Object.keys(byDateMap)
+        .map((date) => {
+          const it = byDateMap[date];
+          const avgU = it.count ? it.totalUn / it.count : 0;
+          const avgG = it.count ? it.totalGr / it.count : 0;
+          return {
+            date,
+            avg_prix_unitaire: avgU.toFixed(2),
+            avg_prix_gros: avgG.toFixed(2),
+            count: it.count,
+            rapports: it.rapports
+          };
+        })
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      const by_employe = Object.keys(byEmployeMap).map((nom) => {
+        const it = byEmployeMap[nom];
+        const avgU = it.count ? it.totalUn / it.count : 0;
+        const avgG = it.count ? it.totalGr / it.count : 0;
+        return {
+          nom,
+          avg_prix_unitaire: avgU.toFixed(2),
+          avg_prix_gros: avgG.toFixed(2),
+          count: it.count
+        };
+      });
+
+      const by_district = Object.keys(byDistrictMap).map((district) => {
+        const it = byDistrictMap[district];
+        const avgU = it.count ? it.totalUn / it.count : 0;
+        const avgG = it.count ? it.totalGr / it.count : 0;
+        const maxU = Math.max(...it.un, 0);
+        const minUArr = it.un.filter((p) => p > 0);
+        const minU = minUArr.length ? Math.min(...minUArr) : 0;
+        const maxG = Math.max(...it.gr, 0);
+        const minGArr = it.gr.filter((p) => p > 0);
+        const minG = minGArr.length ? Math.min(...minGArr) : 0;
+        return {
+          district,
+          avg_prix_unitaire: avgU.toFixed(2),
+          avg_prix_gros: avgG.toFixed(2),
+          count: it.count,
+          max_prix_unitaire: maxU.toFixed(2),
+          min_prix_unitaire: minU.toFixed(2),
+          max_prix_gros: maxG.toFixed(2),
+          min_prix_gros: minG.toFixed(2)
+        };
+      });
+
+      const inflation = [];
+      for (let i = 1; i < by_month.length; i++) {
+        const prev = parseFloat(by_month[i - 1].avg_prix_unitaire);
+        const curr = parseFloat(by_month[i].avg_prix_unitaire);
+        const inflationRate = prev > 0 ? ((curr - prev) / prev) * 100 : 0;
+        inflation.push({ month: by_month[i].month, inflation_rate: inflationRate.toFixed(2) });
+      }
+
+      const basePrice = by_month[0] ? parseFloat(by_month[0].avg_prix_unitaire) : 1;
+      const ipc = by_month.map((m) => ({
+        month: m.month,
+        ipc: basePrice > 0 ? ((parseFloat(m.avg_prix_unitaire) / basePrice) * 100).toFixed(2) : '100.00'
+      }));
+
+      const most_expensive_month = by_month.length
+        ? by_month.reduce((max, m) => (parseFloat(m.avg_prix_unitaire) > parseFloat(max.avg_prix_unitaire) ? m : max), by_month[0]).month
+        : null;
+
+      const price_evolution = by_month.map((m) => ({
+        month: m.month,
+        avg_prix_unitaire: m.avg_prix_unitaire,
+        avg_prix_gros: m.avg_prix_gros
+      }));
+
+      return {
+        total_rapports: total,
+        avg_prix_unitaire: total ? (sumUn / total).toFixed(2) : '0.00',
+        avg_prix_gros: total ? (sumGr / total).toFixed(2) : '0.00',
+        max_prix_unitaire: maxUn.toFixed(2),
+        min_prix_unitaire: minUn.toFixed(2),
+        max_prix_gros: maxGr.toFixed(2),
+        min_prix_gros: minGr.toFixed(2),
+        by_month,
+        by_year,
+        by_date,
+        by_employe,
+        by_district,
+        inflation,
+        ipc,
+        most_expensive_month,
+        price_evolution
+      };
+    };
+
+    const group = {};
+    rapports.forEach((r) => {
+      const region = r.employe?.moderateurDetails?.region || 'Unknown';
+      const empId = r.employe?.idemploye || 'Unknown';
+      const empName = r.employe?.nom || 'Unknown';
+      const empEmail = r.employe?.email || null;
+      const empCin = r.employe?.cin || null;
+      const ppnId = r.ppn?.idppn || 'Unknown';
+      const ppnName = r.ppn?.nomppn || 'Unknown';
+
+      if (!group[region]) {
+        group[region] = { region, employes: {} };
+      }
+
+      if (!group[region].employes[empId]) {
+        group[region].employes[empId] = {
+          idemploye: empId,
+          nom: empName,
+          email: empEmail,
+          cin: empCin,
+          fonction: r.employe?.fonction || null,
+          ppns: {}
+        };
+      }
+
+      if (!group[region].employes[empId].ppns[ppnId]) {
+        group[region].employes[empId].ppns[ppnId] = {
+          idppn: ppnId,
+          nomppn: ppnName,
+          description: r.ppn?.description || null,
+          unitemesureunitaire: r.ppn?.unitemesureunitaire || null,
+          unitemesuregros: r.ppn?.unitemesuregros || null,
+          observation: r.ppn?.observation || null,
+          rapports: []
+        };
+      }
+
+      group[region].employes[empId].ppns[ppnId].rapports.push(r);
+    });
+
+    const regions = Object.keys(group)
+      .sort((a, b) => a.localeCompare(b))
+      .map((regionKey) => {
+        const regionNode = group[regionKey];
+        const employes = Object.keys(regionNode.employes)
+          .map((empKey) => {
+            const empNode = regionNode.employes[empKey];
+            const ppns = Object.keys(empNode.ppns).map((ppnKey) => {
+              const ppnNode = empNode.ppns[ppnKey];
+              const stats = computeStatsFromReports(ppnNode.rapports);
+              return {
+                idppn: ppnNode.idppn,
+                nomppn: ppnNode.nomppn,
+                description: ppnNode.description,
+                unitemesureunitaire: ppnNode.unitemesureunitaire,
+                unitemesuregros: ppnNode.unitemesuregros,
+                observation: ppnNode.observation,
+                total_rapports: stats.total_rapports,
+                avg_prix_unitaire: stats.avg_prix_unitaire,
+                avg_prix_gros: stats.avg_prix_gros,
+                max_prix_unitaire: stats.max_prix_unitaire,
+                min_prix_unitaire: stats.min_prix_unitaire,
+                max_prix_gros: stats.max_prix_gros,
+                min_prix_gros: stats.min_prix_gros,
+                by_year: stats.by_year,
+                by_month: stats.by_month,
+                by_date: stats.by_date,
+                inflation: stats.inflation,
+                ipc: stats.ipc,
+                most_expensive_month: stats.most_expensive_month,
+                price_evolution: stats.price_evolution,
+                latest_rapports: ppnNode.rapports
+                  .slice()
+                  .sort((a, b) => new Date(b.date) - new Date(a.date))
+                  .slice(0, 10)
+                  .map(formatRapport)
+              };
+            });
+
+            const allEmpReports = Object.values(empNode.ppns).flatMap((p) => p.rapports);
+            const empStats = computeStatsFromReports(allEmpReports);
+
+            return {
+              idemploye: empNode.idemploye,
+              nom: empNode.nom,
+              email: empNode.email,
+              cin: empNode.cin,
+              fonction: empNode.fonction,
+              total_rapports: empStats.total_rapports,
+              avg_prix_unitaire: empStats.avg_prix_unitaire,
+              avg_prix_gros: empStats.avg_prix_gros,
+              max_prix_unitaire: empStats.max_prix_unitaire,
+              min_prix_unitaire: empStats.min_prix_unitaire,
+              max_prix_gros: empStats.max_prix_gros,
+              min_prix_gros: empStats.min_prix_gros,
+              by_year: empStats.by_year,
+              by_month: empStats.by_month,
+              by_date: empStats.by_date,
+              inflation: empStats.inflation,
+              ipc: empStats.ipc,
+              most_expensive_month: empStats.most_expensive_month,
+              price_evolution: empStats.price_evolution,
+              ppns
+            };
+          })
+          .sort((a, b) => String(a.nom || '').localeCompare(String(b.nom || '')));
+
+        const allRegionReports = employes.flatMap((e) => e.ppns.flatMap((p) => p.latest_rapports || [])).length
+          ? []
+          : [];
+
+        const regionReportsRaw = Object.values(regionNode.employes).flatMap((e) =>
+          Object.values(e.ppns).flatMap((p) => p.rapports)
+        );
+        const regionStats = computeStatsFromReports(regionReportsRaw);
+
+        return {
+          region: regionNode.region,
+          total_rapports: regionStats.total_rapports,
+          avg_prix_unitaire: regionStats.avg_prix_unitaire,
+          avg_prix_gros: regionStats.avg_prix_gros,
+          max_prix_unitaire: regionStats.max_prix_unitaire,
+          min_prix_unitaire: regionStats.min_prix_unitaire,
+          max_prix_gros: regionStats.max_prix_gros,
+          min_prix_gros: regionStats.min_prix_gros,
+          by_year: regionStats.by_year,
+          by_month: regionStats.by_month,
+          by_date: regionStats.by_date,
+          inflation: regionStats.inflation,
+          ipc: regionStats.ipc,
+          most_expensive_month: regionStats.most_expensive_month,
+          price_evolution: regionStats.price_evolution,
+          employes
+        };
+      });
+
+    const globalStats = computeStatsFromReports(rapports);
+
+    return Helper.send_res(res, {
+      filters: {
+        start_date: start_date || null,
+        end_date: end_date || null,
+        ppn_id: ppn_id || null,
+        district: district || null
+      },
+      total_rapports: globalStats.total_rapports,
+      avg_prix_unitaire: globalStats.avg_prix_unitaire,
+      avg_prix_gros: globalStats.avg_prix_gros,
+      max_prix_unitaire: globalStats.max_prix_unitaire,
+      min_prix_unitaire: globalStats.min_prix_unitaire,
+      max_prix_gros: globalStats.max_prix_gros,
+      min_prix_gros: globalStats.min_prix_gros,
+      by_month: globalStats.by_month,
+      by_year: globalStats.by_year,
+      by_date: globalStats.by_date,
+      by_employe: globalStats.by_employe,
+      by_district: globalStats.by_district,
+      inflation: globalStats.inflation,
+      ipc: globalStats.ipc,
+      most_expensive_month: globalStats.most_expensive_month,
+      price_evolution: globalStats.price_evolution,
+      regions
+    });
+  } catch (err) {
+    console.error(err);
+    return Helper.send_res(res, { erreur: 'Impossible de récupérer le tableau de bord.' }, 500);
+  }
+};
+
+
+// 9 - Moderator Dashboard (regional)
+const getDashboard = async (req, res) => {
+  try {
+    if (!req.employe) {
+      return Helper.send_res(res, { erreur: 'Non authentifié.' }, 401);
+    }
+
+    if (!['MODERATEUR', 'ADMINISTRATEUR'].includes(req.employe.fonction)) {
+      return Helper.send_res(res, { erreur: 'Accès interdit.' }, 403);
+    }
+
+    const Moderateur = db.Moderateur;
 
     const ppns = await Ppn.findAll({ order: [['nom_ppn', 'ASC']] });
 
-    const regionsRows = await db.Moderateur.findAll({
+    const regionsRows = await Moderateur.findAll({
       attributes: ['region'],
       group: ['region'],
     });
     const nombreRegions = regionsRows.length;
 
-    // 3) Rapports ce mois (dans la région du modérateur)
     const startOfMonth = moment().startOf('month').toDate();
     const endOfMonth = moment().endOf('month').toDate();
 
+    let region = null;
+    let includeRegion = [];
+    let comptesEnAttente;
+
+    if (req.employe.fonction === 'MODERATEUR') {
+      const moderateur = await Moderateur.findOne({
+        where: { employe_id: req.employe.id_employe },
+      });
+
+      if (!moderateur) {
+        return Helper.send_res(res, { erreur: 'Profil modérateur introuvable.' }, 404);
+      }
+
+      region = moderateur.region;
+
+      includeRegion = [
+        {
+          model: Employe,
+          as: 'employe',
+          required: true,
+          include: [
+            {
+              model: Moderateur,
+              as: 'moderateurDetails',
+              required: true,
+              where: { region },
+            },
+          ],
+        },
+      ];
+    } else {
+      comptesEnAttente = await Moderateur.count({
+        where: { is_validated: false },
+      });
+    }
+
     const rapportsThisMonth = await Rapport.count({
       where: { date: { [Op.between]: [startOfMonth, endOfMonth] } },
-      include: [
-        { model: Employe, as: 'employe', where: { region }, required: true },
-      ],
+      include: includeRegion,
     });
 
-    // 4) Total rapports (dans la région du modérateur)
     const totalRapports = await Rapport.count({
-      include: [
-        { model: Employe, as: 'employe', where: { region }, required: true },
-      ],
+      include: includeRegion,
     });
 
-    // (Optionnel) Derniers rapports de prix dans la région (avec tous champs prix)
     const latest = await Rapport.findAll({
       include: [
         { model: Ppn, as: 'ppn' },
-        { model: Employe, as: 'employe', where: { region }, required: true },
+        {
+          model: Employe,
+          as: 'employe',
+          required: includeRegion.length > 0,
+          include: includeRegion.length
+            ? [
+                {
+                  model: Moderateur,
+                  as: 'moderateurDetails',
+                  required: true,
+                  where: { region },
+                },
+              ]
+            : [],
+        },
       ],
       order: [['date', 'DESC']],
       limit: 10,
     });
 
-    return Helper.send_res(res, {
+    const payload = {
       region,
       stats: {
         produitsPpn: ppns.length,
         rapportsThisMonth,
         totalRapports,
         nombreRegions,
+        ...(req.employe.fonction === 'ADMINISTRATEUR' ? { comptesEnAttente } : {}),
       },
       ppns: ppns.map((p) => ({
         id_ppn: p.id_ppn,
@@ -650,12 +890,15 @@ const getModeratorDashboard = async (req, res) => {
         employe_id: p.employe_id,
       })),
       latestRapports: latest.map(formatRapport),
-    });
+    };
+
+    return Helper.send_res(res, payload);
   } catch (err) {
     console.error(err);
-    return Helper.send_res(res, { erreur: 'Impossible de récupérer le dashboard modérateur.' }, 500);
+    return Helper.send_res(res, { erreur: 'Impossible de récupérer le dashboard.' }, 500);
   }
 };
+
 
 
 module.exports = {
@@ -666,7 +909,7 @@ module.exports = {
     addRapport,
     updateRapport,
     deleteRapport,
-    getDashboard,
+    getStats,
     getUsersWithRapports,
-    getModeratorDashboard
+    getDashboard
 };

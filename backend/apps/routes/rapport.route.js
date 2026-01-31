@@ -148,7 +148,7 @@ const { IsAuthenticated, IsAuthenticatedAdmin } = require('../../middlewares/aut
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.get('/rapports', IsAuthenticatedAdmin, rapportController.getAllRapports);
+router.get('/rapports', IsAuthenticated, rapportController.getAllRapports);
 
 /**
  * @swagger
@@ -773,11 +773,11 @@ router.delete('/rapports/:id_rapport', IsAuthenticated, rapportController.delete
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.get('/rapports/dashboard/full', IsAuthenticatedAdmin, rapportController.getDashboard);
+router.get('/rapports/dashboard/full', IsAuthenticatedAdmin, rapportController.getStats);
 
 /**
  * @swagger
- * /api/rapports/dashboard/moderateur:
+ * /api/rapports/dashboard/:
  *   get:
  *     summary: Dashboard modérateur (PPN, rapports, régions, derniers rapports)
  *     tags: [Rapports]
@@ -868,9 +868,9 @@ router.get('/rapports/dashboard/full', IsAuthenticatedAdmin, rapportController.g
  *               $ref: '#/components/schemas/Error'
  */
 router.get(
-  '/rapports/dashboard/moderateur',
+  '/dashboard',
   IsAuthenticated,
-  rapportController.getModeratorDashboard
+  rapportController.getDashboard
 );
 
 
