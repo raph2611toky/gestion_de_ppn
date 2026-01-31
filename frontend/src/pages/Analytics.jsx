@@ -7,22 +7,9 @@ import { fetchPpns } from '../utils/produits.js'
 
 const REGIONS = [
   'Toutes les régions',
-  'ANALAMANGA',
-  'VAKINANKARATRA',
-  'ITASY',
-  'BONGOLAVA',
-  'MENABE',
-  'MELAKY',
-  'DIANA',
-  'SAVA',
-  'ANALANJIROFO',
-  'AMORON\'I MANIA',
-  'VATOVAVY FITOVINANY',
-  'ATSIMO ANDREFANA',
-  'ATSIMO ATSINANANA',
-  'ANDROY',
-  'ANOSY',
-  'HAUTE_MATSIATRA'
+  'Analamanga', 'Vakinankaratra', 'Itasy', 'Bongolava', 
+  'Haute Matsiatra', "Amoron'i Mania", 'Vatovavy', 'Fitovinany', 
+  'Atsimo Atsinanana', 'Atsinanana', 'Analanjirofo', 'Alaotra-Mangoro'
 ]
 
 function Analytics() {
@@ -32,23 +19,31 @@ function Analytics() {
   const [loading, setLoading] = useState(true)
   const [selectedProduct, setSelectedProduct] = useState('all')
   const [selectedRegion, setSelectedRegion] = useState('Toutes les régions')
+  const [selectedYear, setSelectedYear] = useState('')
+  const [selectedMonth, setSelectedMonth] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
   const [tableData, setTableData] = useState([])
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
   const [pdfLoading, setPdfLoading] = useState(false)
   const [productsLoading, setProductsLoading] = useState(true)
-  const [selectedMonth, setSelectedMonth] = useState('')
-  const [chartData, setChartData] = useState([])
   const [reportCount, setReportCount] = useState(0)
+  const [chartData, setChartData] = useState([])
+
+  // Auto-fetch quand les filtres changent
+  useEffect(() => {
+    fetchAnalyticsData(selectedProduct, selectedRegion, selectedYear, selectedMonth, startDate, endDate)
+  }, [selectedProduct, selectedRegion, selectedYear, selectedMonth, startDate, endDate])
 
   useEffect(() => {
-    // Charger les PPNs
+    // Charger les PPNs au montage
     const handleSetPpns = (ppnList) => {
       const productsData = [
         { value: 'all', label: 'Tous les produits' },
         ...ppnList.map(ppn => ({
-          value: ppn.id_ppn,
-          label: ppn.nom_ppn
+          value: ppn.id_ppn || ppn.idppn,
+          label: ppn.nom_ppn || ppn.nomppn
         }))
       ]
       setProducts(productsData)
@@ -60,27 +55,30 @@ function Analytics() {
     }
 
     fetchPpns(handleSetPpns, handleError)
-    fetchAnalyticsData()
+    // Appel initial sans paramètres
+    fetchAnalyticsData('all', 'Toutes les régions', '', '', '', '')
   }, [])
 
-  const fetchAnalyticsData = async (ppnId = null, region = null) => {
+  const fetchAnalyticsData = async (ppnId = 'all', region = 'Toutes les régions', year = '', month = '', startDt = '', endDt = '') => {
     setLoading(true)
     try {
-      console.log('[v0] Fetching analytics from /rapports/dashboard/full')
-      let url = '/rapports/dashboard/full?'
-      const params = []
+      const params = new URLSearchParams()
       
-      if (ppnId && ppnId !== 'all') params.push(`ppn_id=${ppnId}`)
-      if (region && region !== 'Toutes les régions') params.push(`region=${region}`)
-      if (selectedMonth) params.push(`month=${selectedMonth}`)
+      if (ppnId && ppnId !== 'all') params.append('ppn_id', ppnId)
+      if (region && region !== 'Toutes les régions') params.append('region', region)
+      if (year) params.append('year', year)
+      if (month) params.append('month', month)
+      if (startDt) params.append('start_date', startDt)
+      if (endDt) params.append('end_date', endDt)
       
-      url += params.join('&')
+      const url = `/rapports/dashboard/full?${params.toString()}`
+      console.log('[+] Fetching:', url)
       
       const response = await api.get(url)
-      console.log('[v0] Analytics data:', response.data)
+      console.log('[+] Analytics data:', response.data)
       setAnalyticsData(response.data)
       
-      // Extraire tous les rapports du by_date
+      // Extraire tous les rapports du by_date pour le tableau
       const allRapports = []
       if (response.data.by_date && Array.isArray(response.data.by_date)) {
         response.data.by_date.forEach(dateGroup => {
@@ -95,7 +93,7 @@ function Analytics() {
       setReportCount(allRapports.length)
       setChartData(response.data.by_month || [])
     } catch (err) {
-      console.log('[v0] Erreur lors du chargement:', err.message)
+      console.log('[+] Erreur lors du chargement:', err.message)
       showNotification('error', 'Impossible de charger les données')
       setAnalyticsData(null)
       setTableData([])
@@ -104,6 +102,26 @@ function Analytics() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Générer les années disponibles
+  const getAvailableYears = () => {
+    if (!analyticsData?.by_year) return []
+    return analyticsData.by_year.map(item => item.year).sort((a, b) => b - a)
+  }
+
+  // Générer les mois disponibles (filtrés par année si sélectionnée)
+  const getAvailableMonths = () => {
+    if (!analyticsData?.by_month) return []
+    
+    let months = analyticsData.by_month.map(item => item.month)
+    
+    // Si une année est sélectionnée, filtrer par année
+    if (selectedYear) {
+      months = months.filter(month => month.startsWith(selectedYear))
+    }
+    
+    return months.sort().reverse()
   }
 
   const handleApplyFilters = () => {
@@ -122,7 +140,7 @@ function Analytics() {
 
     setPdfLoading(true)
     try {
-      console.log('[v0] Generating PDF for region:', selectedRegion)
+      console.log('[+] Generating PDF for region:', selectedRegion)
       const response = await api.get(`/rapports/export/pdf`, {
         params: {
           region: selectedRegion,
@@ -141,7 +159,7 @@ function Analytics() {
       link.parentElement.removeChild(link)
       showNotification('success', 'PDF généré et téléchargé')
     } catch (err) {
-      console.log('[v0] Erreur lors de la génération du PDF:', err.message)
+      console.log('[+] Erreur lors de la génération du PDF:', err.message)
       showNotification('error', 'Impossible de générer le PDF')
     } finally {
       setPdfLoading(false)
@@ -216,29 +234,106 @@ function Analytics() {
               ))}
             </select>
           </div>
+
+          {/* Année */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', color: '#374151' }}>
+              Année
+            </label>
+            <select
+              value={selectedYear}
+              onChange={(e) => {
+                setSelectedYear(e.target.value)
+                setSelectedMonth('')
+              }}
+              style={{
+                width: '100%',
+                padding: '0.625rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.375rem',
+                fontSize: '0.875rem',
+                backgroundColor: 'white',
+                cursor: 'pointer'
+              }}
+            >
+              <option value="">Toutes les années</option>
+              {getAvailableYears().map(year => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Mois */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', color: '#374151' }}>
+              Mois
+            </label>
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.625rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.375rem',
+                fontSize: '0.875rem',
+                backgroundColor: 'white',
+                cursor: 'pointer'
+              }}
+            >
+              <option value="">Tous les mois</option>
+              {getAvailableMonths().map(month => (
+                <option key={month} value={month}>
+                  {month}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Date début */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', color: '#374151' }}>
+              Date début
+            </label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.625rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.375rem',
+                fontSize: '0.875rem'
+              }}
+            />
+          </div>
+
+          {/* Date fin */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', fontSize: '0.875rem', color: '#374151' }}>
+              Date fin
+            </label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.625rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.375rem',
+                fontSize: '0.875rem'
+              }}
+            />
+          </div>
         </div>
 
-        {/* Boutons d'action */}
-        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-          <button
-            onClick={handleApplyFilters}
-            disabled={loading}
-            style={{
-              padding: '0.625rem 1.25rem',
-              backgroundColor: '#2563eb',
-              color: 'white',
-              border: 'none',
-              borderRadius: '0.375rem',
-              cursor: 'pointer',
-              fontWeight: 'bold',
-              fontSize: '0.875rem',
-              opacity: loading ? 0.5 : 1
-            }}
-          >
-            Appliquer les filtres
-          </button>
-
-          {selectedRegion !== 'Toutes les régions' && (
+        {/* Bouton PDF */}
+        {selectedRegion !== 'Toutes les régions' && (
+          <div style={{ marginTop: '1rem' }}>
             <button
               onClick={generatePDF}
               disabled={pdfLoading || !analyticsData}
@@ -256,13 +351,30 @@ function Analytics() {
             >
               {pdfLoading ? 'Génération...' : 'Générer PDF'}
             </button>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Compteur de rapports */}
         {analyticsData && (
-          <div style={{ marginTop: '1rem', fontSize: '1rem', fontWeight: 'bold', color: '#374151' }}>
-            {analyticsData.total_rapports} rapport(s)
+          <div style={{ marginTop: '1rem', display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
+            <div>
+              <span style={{ fontSize: '0.875rem', color: '#666' }}>Total rapports: </span>
+              <span style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#2563eb' }}>
+                {analyticsData.total_rapports}
+              </span>
+            </div>
+            <div>
+              <span style={{ fontSize: '0.875rem', color: '#666' }}>Prix unitaire moyen: </span>
+              <span style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#2563eb' }}>
+                {parseFloat(analyticsData.avg_prix_unitaire || 0).toLocaleString()} Ar
+              </span>
+            </div>
+            <div>
+              <span style={{ fontSize: '0.875rem', color: '#666' }}>Prix gros moyen: </span>
+              <span style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#10b981' }}>
+                {parseFloat(analyticsData.avg_prix_gros || 0).toLocaleString()} Ar
+              </span>
+            </div>
           </div>
         )}
       </div>

@@ -339,17 +339,24 @@ const deleteRapport = async (req, res) => {
         return Helper.send_res(res, { erreur: 'Impossible de supprimer le rapport.' }, 500);
     }
 };
-
-// 8 - Admin Stats and Analytics
 const getStats = async (req, res) => {
   try {
     if (!req.employe || req.employe.fonction !== 'ADMINISTRATEUR') {
       return Helper.send_res(res, { erreur: 'Accès réservé aux administrateurs.' }, 403);
     }
 
-    const { start_date, end_date, ppn_id, district } = req.query;
+    const {
+      ppn_id,
+      region,
+      year,
+      month,
+      start_date,
+      end_date,
+      district
+    } = req.query;
 
     const whereClause = {};
+
     if (start_date && end_date) {
       if (!moment(start_date).isValid() || !moment(end_date).isValid()) {
         return Helper.send_res(res, { erreur: 'Dates invalides.' }, 400);
@@ -358,18 +365,49 @@ const getStats = async (req, res) => {
       const end = moment(end_date).endOf('day').toDate();
       whereClause.date = { [Op.between]: [start, end] };
     }
-    if (ppn_id) {
-      whereClause.ppnid = ppn_id;
+
+    if (month && month !== 'Tous les mois') {
+      if (!moment(month, 'YYYY-MM', true).isValid()) {
+        return Helper.send_res(res, { erreur: 'Mois invalide (format attendu YYYY-MM).' }, 400);
+      }
+      const start = moment(month, 'YYYY-MM').startOf('month').toDate();
+      const end = moment(month, 'YYYY-MM').endOf('month').toDate();
+      whereClause.date = { [Op.between]: [start, end] };
+    } else if (year && year !== 'Toutes les années') {
+      if (!moment(year, 'YYYY', true).isValid()) {
+        return Helper.send_res(res, { erreur: 'Année invalide (format attendu YYYY).' }, 400);
+      }
+      const start = moment(year, 'YYYY').startOf('year').toDate();
+      const end = moment(year, 'YYYY').endOf('year').toDate();
+      whereClause.date = { [Op.between]: [start, end] };
     }
+
+    if (ppn_id && ppn_id !== 'all') {
+      whereClause.ppn_id = ppn_id;
+    }
+
     if (district) {
       whereClause.district = { [Op.like]: `%${district}%` };
+    }
+
+    const includeEmploye = {
+      model: Employe,
+      as: 'employe',
+      required: true,
+      include: [{ model: db.Moderateur, as: 'moderateurDetails', required: false }]
+    };
+
+    if (region && region !== 'Toutes les régions') {
+      includeEmploye.include = [
+        { model: db.Moderateur, as: 'moderateurDetails', required: true, where: { region } }
+      ];
     }
 
     const rapports = await Rapport.findAll({
       where: whereClause,
       include: [
         { model: Ppn, as: 'ppn' },
-        { model: Employe, as: 'employe', include: [{ model: db.Moderateur, as: 'moderateurDetails' }] }
+        includeEmploye
       ],
       order: [['date', 'ASC']]
     });
@@ -394,25 +432,15 @@ const getStats = async (req, res) => {
         const avgPrixGros = (prixGrMin + prixGrMax) / 2;
 
         const d = moment(r.date);
-        const month = d.format('YYYY-MM');
-        const year = d.format('YYYY');
+        const m = d.format('YYYY-MM');
+        const y = d.format('YYYY');
         const day = d.format('YYYY-MM-DD');
 
-        const region = r.employe?.moderateurDetails?.region || 'Unknown';
-        const ppnName = r.ppn?.nomppn || 'Unknown';
+        const reg = r.employe?.moderateurDetails?.region || 'Unknown';
+        const ppnName = r.ppn?.nom_ppn || 'Unknown';
         const empName = r.employe?.nom || 'Unknown';
 
-        return {
-          rapport: r,
-          avgPrixUnitaire,
-          avgPrixGros,
-          month,
-          year,
-          day,
-          region,
-          ppnName,
-          empName
-        };
+        return { rapport: r, avgPrixUnitaire, avgPrixGros, month: m, year: y, day, region: reg, ppnName, empName };
       });
 
       const total = parsed.length;
@@ -434,7 +462,6 @@ const getStats = async (req, res) => {
       const byDateMap = {};
       const byDistrictMap = {};
       const byEmployeMap = {};
-      const priceChangesByPpn = {};
 
       parsed.forEach((x) => {
         const m = x.month;
@@ -443,13 +470,12 @@ const getStats = async (req, res) => {
         const dist = x.rapport.district || 'Unknown';
         const emp = x.empName;
 
-        if (!byMonthMap[m]) byMonthMap[m] = { totalUn: 0, totalGr: 0, count: 0, un: [], gr: [], dates: [] };
+        if (!byMonthMap[m]) byMonthMap[m] = { totalUn: 0, totalGr: 0, count: 0, un: [], gr: [] };
         byMonthMap[m].totalUn += x.avgPrixUnitaire;
         byMonthMap[m].totalGr += x.avgPrixGros;
         byMonthMap[m].count += 1;
         byMonthMap[m].un.push(x.avgPrixUnitaire);
         byMonthMap[m].gr.push(x.avgPrixGros);
-        byMonthMap[m].dates.push(d);
 
         if (!byYearMap[y]) byYearMap[y] = { totalUn: 0, totalGr: 0, count: 0 };
         byYearMap[y].totalUn += x.avgPrixUnitaire;
@@ -473,9 +499,6 @@ const getStats = async (req, res) => {
         byEmployeMap[emp].totalUn += x.avgPrixUnitaire;
         byEmployeMap[emp].totalGr += x.avgPrixGros;
         byEmployeMap[emp].count += 1;
-
-        if (!priceChangesByPpn[x.ppnName]) priceChangesByPpn[x.ppnName] = [];
-        priceChangesByPpn[x.ppnName].push({ date: d, price: x.avgPrixUnitaire });
       });
 
       const by_month = Object.keys(byMonthMap)
@@ -507,12 +530,7 @@ const getStats = async (req, res) => {
           const it = byYearMap[year];
           const avgU = it.count ? it.totalUn / it.count : 0;
           const avgG = it.count ? it.totalGr / it.count : 0;
-          return {
-            year,
-            avg_prix_unitaire: avgU.toFixed(2),
-            avg_prix_gros: avgG.toFixed(2),
-            count: it.count
-          };
+          return { year, avg_prix_unitaire: avgU.toFixed(2), avg_prix_gros: avgG.toFixed(2), count: it.count };
         })
         .sort((a, b) => a.year.localeCompare(b.year));
 
@@ -521,13 +539,7 @@ const getStats = async (req, res) => {
           const it = byDateMap[date];
           const avgU = it.count ? it.totalUn / it.count : 0;
           const avgG = it.count ? it.totalGr / it.count : 0;
-          return {
-            date,
-            avg_prix_unitaire: avgU.toFixed(2),
-            avg_prix_gros: avgG.toFixed(2),
-            count: it.count,
-            rapports: it.rapports
-          };
+          return { date, avg_prix_unitaire: avgU.toFixed(2), avg_prix_gros: avgG.toFixed(2), count: it.count, rapports: it.rapports };
         })
         .sort((a, b) => a.date.localeCompare(b.date));
 
@@ -535,12 +547,7 @@ const getStats = async (req, res) => {
         const it = byEmployeMap[nom];
         const avgU = it.count ? it.totalUn / it.count : 0;
         const avgG = it.count ? it.totalGr / it.count : 0;
-        return {
-          nom,
-          avg_prix_unitaire: avgU.toFixed(2),
-          avg_prix_gros: avgG.toFixed(2),
-          count: it.count
-        };
+        return { nom, avg_prix_unitaire: avgU.toFixed(2), avg_prix_gros: avgG.toFixed(2), count: it.count };
       });
 
       const by_district = Object.keys(byDistrictMap).map((district) => {
@@ -569,14 +576,14 @@ const getStats = async (req, res) => {
       for (let i = 1; i < by_month.length; i++) {
         const prev = parseFloat(by_month[i - 1].avg_prix_unitaire);
         const curr = parseFloat(by_month[i].avg_prix_unitaire);
-        const inflationRate = prev > 0 ? ((curr - prev) / prev) * 100 : 0;
-        inflation.push({ month: by_month[i].month, inflation_rate: inflationRate.toFixed(2) });
+        const rate = prev > 0 ? ((curr - prev) / prev) * 100 : 0;
+        inflation.push({ month: by_month[i].month, inflationrate: rate.toFixed(2) });
       }
 
-      const basePrice = by_month[0] ? parseFloat(by_month[0].avg_prix_unitaire) : 1;
+      const base = by_month[0] ? parseFloat(by_month[0].avg_prix_unitaire) : 1;
       const ipc = by_month.map((m) => ({
         month: m.month,
-        ipc: basePrice > 0 ? ((parseFloat(m.avg_prix_unitaire) / basePrice) * 100).toFixed(2) : '100.00'
+        ipc: base > 0 ? ((parseFloat(m.avg_prix_unitaire) / base) * 100).toFixed(2) : '100.00'
       }));
 
       const most_expensive_month = by_month.length
@@ -601,31 +608,30 @@ const getStats = async (req, res) => {
         by_year,
         by_date,
         by_employe,
-        by_district,
+        by_district: by_district,
         inflation,
         ipc,
-        most_expensive_month,
+        most_expensive_month: most_expensive_month,
         price_evolution
       };
     };
 
     const group = {};
     rapports.forEach((r) => {
-      const region = r.employe?.moderateurDetails?.region || 'Unknown';
+      const reg = r.employe?.moderateurDetails?.region || 'Unknown';
       const empId = r.employe?.idemploye || 'Unknown';
       const empName = r.employe?.nom || 'Unknown';
       const empEmail = r.employe?.email || null;
       const empCin = r.employe?.cin || null;
-      const ppnId = r.ppn?.idppn || 'Unknown';
-      const ppnName = r.ppn?.nomppn || 'Unknown';
 
-      if (!group[region]) {
-        group[region] = { region, employes: {} };
-      }
+      const ppnId = r.ppn?.id_ppn || 'Unknown';
+      const ppnName = r.ppn?.nom_ppn || 'Unknown';
 
-      if (!group[region].employes[empId]) {
-        group[region].employes[empId] = {
-          idemploye: empId,
+      if (!group[reg]) group[reg] = { region: reg, employes: {} };
+
+      if (!group[reg].employes[empId]) {
+        group[reg].employes[empId] = {
+          id_employe: empId,
           nom: empName,
           email: empEmail,
           cin: empCin,
@@ -634,37 +640,40 @@ const getStats = async (req, res) => {
         };
       }
 
-      if (!group[region].employes[empId].ppns[ppnId]) {
-        group[region].employes[empId].ppns[ppnId] = {
-          idppn: ppnId,
-          nomppn: ppnName,
+      if (!group[reg].employes[empId].ppns[ppnId]) {
+        group[reg].employes[empId].ppns[ppnId] = {
+          id_ppn: ppnId,
+          nom_ppn: ppnName,
           description: r.ppn?.description || null,
-          unitemesureunitaire: r.ppn?.unitemesureunitaire || null,
-          unitemesuregros: r.ppn?.unitemesuregros || null,
+          unite_mesure_unitaire: r.ppn?.unite_mesure_unitaire || null,
+          unite_mesure_gros: r.ppn?.unite_mesure_gros || null,
           observation: r.ppn?.observation || null,
           rapports: []
         };
       }
 
-      group[region].employes[empId].ppns[ppnId].rapports.push(r);
+      group[reg].employes[empId].ppns[ppnId].rapports.push(r);
     });
 
     const regions = Object.keys(group)
       .sort((a, b) => a.localeCompare(b))
-      .map((regionKey) => {
-        const regionNode = group[regionKey];
+      .map((regKey) => {
+        const regionNode = group[regKey];
+
         const employes = Object.keys(regionNode.employes)
           .map((empKey) => {
             const empNode = regionNode.employes[empKey];
+
             const ppns = Object.keys(empNode.ppns).map((ppnKey) => {
               const ppnNode = empNode.ppns[ppnKey];
               const stats = computeStatsFromReports(ppnNode.rapports);
+
               return {
-                idppn: ppnNode.idppn,
-                nomppn: ppnNode.nomppn,
+                id_ppn: ppnNode.id_ppn,
+                nom_ppn: ppnNode.nom_ppn,
                 description: ppnNode.description,
-                unitemesureunitaire: ppnNode.unitemesureunitaire,
-                unitemesuregros: ppnNode.unitemesuregros,
+                unite_mesure_unitaire: ppnNode.unite_mesure_unitaire,
+                unite_mesure_gros: ppnNode.unite_mesure_gros,
                 observation: ppnNode.observation,
                 total_rapports: stats.total_rapports,
                 avg_prix_unitaire: stats.avg_prix_unitaire,
@@ -676,6 +685,8 @@ const getStats = async (req, res) => {
                 by_year: stats.by_year,
                 by_month: stats.by_month,
                 by_date: stats.by_date,
+                by_employe: stats.by_employe,
+                by_district: stats.by_district,
                 inflation: stats.inflation,
                 ipc: stats.ipc,
                 most_expensive_month: stats.most_expensive_month,
@@ -692,7 +703,7 @@ const getStats = async (req, res) => {
             const empStats = computeStatsFromReports(allEmpReports);
 
             return {
-              idemploye: empNode.idemploye,
+              id_employe: empNode.id_employe,
               nom: empNode.nom,
               email: empNode.email,
               cin: empNode.cin,
@@ -707,6 +718,8 @@ const getStats = async (req, res) => {
               by_year: empStats.by_year,
               by_month: empStats.by_month,
               by_date: empStats.by_date,
+              by_employe: empStats.by_employe,
+              by_district: empStats.by_district,
               inflation: empStats.inflation,
               ipc: empStats.ipc,
               most_expensive_month: empStats.most_expensive_month,
@@ -715,10 +728,6 @@ const getStats = async (req, res) => {
             };
           })
           .sort((a, b) => String(a.nom || '').localeCompare(String(b.nom || '')));
-
-        const allRegionReports = employes.flatMap((e) => e.ppns.flatMap((p) => p.latest_rapports || [])).length
-          ? []
-          : [];
 
         const regionReportsRaw = Object.values(regionNode.employes).flatMap((e) =>
           Object.values(e.ppns).flatMap((p) => p.rapports)
@@ -737,6 +746,8 @@ const getStats = async (req, res) => {
           by_year: regionStats.by_year,
           by_month: regionStats.by_month,
           by_date: regionStats.by_date,
+          by_employe: regionStats.by_employe,
+          by_district: regionStats.by_district,
           inflation: regionStats.inflation,
           ipc: regionStats.ipc,
           most_expensive_month: regionStats.most_expensive_month,
@@ -749,9 +760,12 @@ const getStats = async (req, res) => {
 
     return Helper.send_res(res, {
       filters: {
+        ppn_id: ppn_id || null,
+        region: region || null,
+        year: year || null,
+        month: month || null,
         start_date: start_date || null,
         end_date: end_date || null,
-        ppn_id: ppn_id || null,
         district: district || null
       },
       total_rapports: globalStats.total_rapports,

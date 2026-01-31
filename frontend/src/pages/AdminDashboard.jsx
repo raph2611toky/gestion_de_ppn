@@ -16,12 +16,12 @@ function AdminDashboard({ onNavigate }) {
   const fetchDashboardData = async () => {
     setIsLoading(true)
     try {
-      console.log('[v0] Fetching admin dashboard data...')
+      console.log('[+] Fetching admin dashboard data...')
       const response = await api.get('/dashboard')
       setDashboardData(response.data)
-      console.log('[v0] Admin dashboard data:', response.data)
+      console.log('[+] Admin dashboard data:', response.data)
     } catch (err) {
-      console.log('[v0] Erreur lors du chargement du dashboard admin:', err.message)
+      console.log('[+] Erreur lors du chargement du dashboard admin:', err.message)
       showNotification('error', 'Impossible de charger les données du dashboard')
     } finally {
       setIsLoading(false)

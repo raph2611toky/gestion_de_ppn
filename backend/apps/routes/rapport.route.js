@@ -777,7 +777,7 @@ router.get('/rapports/dashboard/full', IsAuthenticatedAdmin, rapportController.g
 
 /**
  * @swagger
- * /api/rapports/dashboard/:
+ * /api/dashboard/:
  *   get:
  *     summary: Dashboard modérateur (PPN, rapports, régions, derniers rapports)
  *     tags: [Rapports]

@@ -27,7 +27,7 @@ function RegionalDashboard({ onNavigate }) {
     setIsLoading(true)
     try {
       console.log('[+] Fetching dashboard data...')
-      const response = await api.get('/rapports/dashboard')
+      const response = await api.get('/dashboard')
       setDashboardData(response.data)
       setRapports(response.data.rapports); // Assign rapports data
       setPpns(response.data.ppns); // Assign ppns data
