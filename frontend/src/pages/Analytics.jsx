@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import api from '../utils/api.js'
 import { useNotification } from '../components/Notifications.jsx'
 import { fetchPpns } from '../utils/produits.js'
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 const REGIONS = [
   'Toutes les régions',
@@ -32,6 +33,13 @@ function Analytics() {
   const [chartData, setChartData] = useState([])
   const [chartViewMode, setChartViewMode] = useState('month') // 'month' ou 'date'
   const [chartMonthData, setChartMonthData] = useState([]) // Declare chartMonthData variable
+  const [ppnsByDate, setPpnsByDate] = useState({}) // Track PPNs by date for line chart
+
+  // Couleurs pour les différents PPNs
+  const COLORS = [
+    '#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899',
+    '#06b6d4', '#84cc16', '#f97316', '#6366f1', '#14b8a6', '#d946ef'
+  ]
 
   // Auto-fetch quand les filtres changent
   useEffect(() => {
@@ -179,6 +187,71 @@ function Analytics() {
       // Par mois (utilise by_date du mois courant par défaut)
       return analyticsData?.by_date || []
     }
+  }
+
+  // Préparer les données pour le line chart des prix par PPN
+  const getPriceChartData = () => {
+    if (chartViewMode === 'month') {
+      // Par mois
+      return (analyticsData?.by_month || []).map(item => {
+        const obj = {
+          name: item.month,
+          avg_prix_unitaire: parseFloat(item.avg_prix_unitaire || 0),
+          avg_prix_gros: parseFloat(item.avg_prix_gros || 0),
+        }
+        return obj
+      })
+    } else {
+      // Par date - si c'est "tous les produits", grouper par PPN
+      if (selectedProduct === 'all' && analyticsData?.by_date) {
+        const ppnMap = {}
+        
+        analyticsData.by_date.forEach(dateItem => {
+          if (dateItem.rapports && Array.isArray(dateItem.rapports)) {
+            dateItem.rapports.forEach(rapport => {
+              const ppnId = rapport.ppn_id
+              const ppnName = rapport.ppn?.nom_ppn || `PPN ${ppnId}`
+              
+              if (!ppnMap[dateItem.date]) {
+                ppnMap[dateItem.date] = { date: dateItem.date }
+              }
+              
+              ppnMap[dateItem.date][`ppn_${ppnId}_prix_unitaire`] = parseFloat(rapport.prix_unitaire_min || 0)
+              ppnMap[dateItem.date][`ppn_${ppnId}_nom`] = ppnName
+            })
+          }
+        })
+        
+        return Object.values(ppnMap).sort((a, b) => new Date(a.date) - new Date(b.date))
+      } else {
+        // Si un produit spécifique est sélectionné
+        return (analyticsData?.by_date || []).map(item => ({
+          date: item.date,
+          avg_prix_unitaire: parseFloat(item.avg_prix_unitaire || 0),
+          avg_prix_gros: parseFloat(item.avg_prix_gros || 0),
+        }))
+      }
+    }
+  }
+
+  // Extraire les PPNs uniques pour le line chart
+  const getUniquePpns = () => {
+    if (selectedProduct === 'all' && chartViewMode === 'date' && analyticsData?.by_date) {
+      const ppnSet = new Map()
+      analyticsData.by_date.forEach(dateItem => {
+        if (dateItem.rapports && Array.isArray(dateItem.rapports)) {
+          dateItem.rapports.forEach(rapport => {
+            const ppnId = rapport.ppn_id
+            const ppnName = rapport.ppn?.nom_ppn || `PPN ${ppnId}`
+            if (!ppnSet.has(ppnId)) {
+              ppnSet.set(ppnId, ppnName)
+            }
+          })
+        }
+      })
+      return Array.from(ppnSet.entries())
+    }
+    return []
   }
 
   const chartDisplayData = getChartData()
@@ -438,7 +511,7 @@ function Analytics() {
           </div>
 
           {/* Deux charts côte à côte */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '2rem', marginBottom: '2rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(500px, 1fr))', gap: '2rem', marginBottom: '2rem', alignItems: 'stretch' }}>
             {/* Histogramme - Nombre de rapports */}
             <div style={{
               backgroundColor: 'white',
@@ -451,32 +524,32 @@ function Analytics() {
                 Nombre de rapports par {chartLabel}
               </h3>
               {chartDisplayData.length > 0 ? (
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.5rem', height: '200px', overflowX: 'auto', paddingBottom: '0.5rem' }}>
-                  {chartDisplayData.map((item, idx) => {
-                    const maxCount = Math.max(...chartDisplayData.map(d => d.count))
-                    const height = (item.count / maxCount) * 100
-                    return (
-                      <div key={idx} style={{ flex: '0 0 auto', minWidth: '60px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                        <div style={{
-                          width: '100%',
-                          height: `${height}%`,
-                          backgroundColor: '#2563eb',
-                          borderRadius: '0.25rem 0.25rem 0 0',
-                          display: 'flex',
-                          alignItems: 'flex-end',
-                          justifyContent: 'center',
-                          color: 'white',
-                          fontSize: '0.75rem',
-                          fontWeight: 'bold'
-                        }}>
-                          {item.count > 0 && <span>{item.count}</span>}
-                        </div>
-                        <div style={{ fontSize: '0.7rem', marginTop: '0.5rem', textAlign: 'center', color: '#666', wordBreak: 'break-word', width: '100%' }}>
-                          {item[dateField]}
-                        </div>
-                      </div>
-                    )
-                  })}
+                <div style={{ width: '100%', height: '400px' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartDisplayData} margin={{ top: 5, right: 30, left: 0, bottom: 80 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey={dateField}
+                        angle={-45}
+                        textAnchor="end"
+                        height={100}
+                        interval={Math.floor(chartDisplayData.length / 6) || 0}
+                      />
+                      <YAxis />
+                      <Tooltip 
+                        formatter={(value) => value}
+                        labelStyle={{ color: '#000' }}
+                        contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb' }}
+                      />
+                      <Legend />
+                      <Bar 
+                        dataKey="count" 
+                        fill="#2563eb" 
+                        name="Nombre de rapports"
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
               ) : (
                 <div style={{ textAlign: 'center', color: '#999', padding: '2rem' }}>
@@ -496,33 +569,81 @@ function Analytics() {
               <h3 style={{ marginBottom: '1rem', fontSize: '1rem', fontWeight: 'bold', color: '#374151' }}>
                 Évolution des prix moyens par {chartLabel}
               </h3>
-              {chartDisplayData.length > 0 ? (
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1.5rem', overflowX: 'auto', paddingBottom: '1rem' }}>
-                  {chartDisplayData.map((item, idx) => (
-                    <div key={idx} style={{ flex: '0 0 auto', minWidth: '140px', display: 'flex', flexDirection: 'column', alignItems: 'center', backgroundColor: '#f9fafb', padding: '0.75rem', borderRadius: '0.375rem', border: '1px solid #e5e7eb' }}>
-                      <div style={{ fontSize: '0.7rem', color: '#2563eb', fontWeight: 'bold', marginBottom: '0.5rem', textAlign: 'center' }}>
-                        Prix Unit.
-                      </div>
-                      <div style={{ fontSize: '1rem', color: '#2563eb', fontWeight: 'bold', marginBottom: '0.75rem', textAlign: 'center' }}>
-                        {parseFloat(item.avg_prix_unitaire || 0).toLocaleString()} Ar
-                      </div>
-                      <div style={{ fontSize: '0.7rem', color: '#10b981', fontWeight: 'bold', marginBottom: '0.5rem', textAlign: 'center' }}>
-                        Prix Gros
-                      </div>
-                      <div style={{ fontSize: '1rem', color: '#10b981', fontWeight: 'bold', marginBottom: '0.75rem', textAlign: 'center' }}>
-                        {parseFloat(item.avg_prix_gros || 0).toLocaleString()} Ar
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: '#666', fontWeight: 'bold', textAlign: 'center', borderTop: '1px solid #e5e7eb', paddingTop: '0.5rem', width: '100%' }}>
-                        {item[dateField]}
-                      </div>
+              {(() => {
+                const priceData = getPriceChartData()
+                const uniquePpns = getUniquePpns()
+                
+                if (priceData.length === 0) {
+                  return (
+                    <div style={{ textAlign: 'center', color: '#999', padding: '2rem' }}>
+                      Aucune donnée
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div style={{ textAlign: 'center', color: '#999', padding: '2rem' }}>
-                  Aucune donnée
-                </div>
-              )}
+                  )
+                }
+                
+                return (
+                  <div style={{ width: '100%', height: '400px' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={priceData} margin={{ top: 5, right: 30, left: 50, bottom: 80 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                        <XAxis 
+                          dataKey={chartViewMode === 'month' ? 'name' : 'date'}
+                          angle={-45}
+                          textAnchor="end"
+                          height={100}
+                          interval={Math.floor(priceData.length / 6) || 0}
+                        />
+                        <YAxis width={60} />
+                        <Tooltip 
+                          formatter={(value) => parseFloat(value || 0).toLocaleString() + ' Ar'}
+                          labelStyle={{ color: '#000' }}
+                          contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '0.375rem', padding: '0.75rem' }}
+                          cursor={{ stroke: '#d1d5db', strokeWidth: 2 }}
+                        />
+                        <Legend wrapperStyle={{ paddingTop: '1rem' }} />
+                        
+                        {/* Si tous les PPNs sont sélectionnés et qu'on est en mode par date */}
+                        {selectedProduct === 'all' && chartViewMode === 'date' && uniquePpns.length > 0 ? (
+                          uniquePpns.map((ppnEntry, idx) => (
+                            <Line
+                              key={`ppn_${ppnEntry[0]}`}
+                              type="monotone"
+                              dataKey={`ppn_${ppnEntry[0]}_prix_unitaire`}
+                              stroke={COLORS[idx % COLORS.length]}
+                              name={ppnEntry[1]}
+                              dot={false}
+                              activeDot={{ r: 6, fill: COLORS[idx % COLORS.length] }}
+                              strokeWidth={2}
+                              isAnimationActive={true}
+                            />
+                          ))
+                        ) : (
+                          <>
+                            <Line
+                              type="monotone"
+                              dataKey="avg_prix_unitaire"
+                              stroke="#2563eb"
+                              name="Prix unitaire moyen"
+                              dot={false}
+                              activeDot={{ r: 6, fill: '#2563eb' }}
+                              strokeWidth={2}
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="avg_prix_gros"
+                              stroke="#10b981"
+                              name="Prix gros moyen"
+                              dot={false}
+                              activeDot={{ r: 6, fill: '#10b981' }}
+                              strokeWidth={2}
+                            />
+                          </>
+                        )}
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                )
+              })()}
             </div>
           </div>
 
