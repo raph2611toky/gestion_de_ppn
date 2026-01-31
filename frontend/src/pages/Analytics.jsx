@@ -30,6 +30,8 @@ function Analytics() {
   const [productsLoading, setProductsLoading] = useState(true)
   const [reportCount, setReportCount] = useState(0)
   const [chartData, setChartData] = useState([])
+  const [chartViewMode, setChartViewMode] = useState('month') // 'month' ou 'date'
+  const [chartMonthData, setChartMonthData] = useState([]) // Declare chartMonthData variable
 
   // Auto-fetch quand les filtres changent
   useEffect(() => {
@@ -72,10 +74,10 @@ function Analytics() {
       if (endDt) params.append('end_date', endDt)
       
       const url = `/rapports/dashboard/full?${params.toString()}`
-      console.log('[+] Fetching:', url)
+      console.log('[v0] Fetching:', url)
       
       const response = await api.get(url)
-      console.log('[+] Analytics data:', response.data)
+      console.log('[v0] Analytics data:', response.data)
       setAnalyticsData(response.data)
       
       // Extraire tous les rapports du by_date pour le tableau
@@ -92,13 +94,15 @@ function Analytics() {
       setCurrentPage(1)
       setReportCount(allRapports.length)
       setChartData(response.data.by_month || [])
+      setChartMonthData(response.data.by_month || []) // Set chartMonthData with response data
     } catch (err) {
-      console.log('[+] Erreur lors du chargement:', err.message)
+      console.log('[v0] Erreur lors du chargement:', err.message)
       showNotification('error', 'Impossible de charger les données')
       setAnalyticsData(null)
       setTableData([])
       setReportCount(0)
       setChartData([])
+      setChartMonthData([]) // Reset chartMonthData on error
     } finally {
       setLoading(false)
     }
@@ -140,7 +144,7 @@ function Analytics() {
 
     setPdfLoading(true)
     try {
-      console.log('[+] Generating PDF for region:', selectedRegion)
+      console.log('[v0] Generating PDF for region:', selectedRegion)
       const response = await api.get(`/rapports/export/pdf`, {
         params: {
           region: selectedRegion,
@@ -159,7 +163,7 @@ function Analytics() {
       link.parentElement.removeChild(link)
       showNotification('success', 'PDF généré et téléchargé')
     } catch (err) {
-      console.log('[+] Erreur lors de la génération du PDF:', err.message)
+      console.log('[v0] Erreur lors de la génération du PDF:', err.message)
       showNotification('error', 'Impossible de générer le PDF')
     } finally {
       setPdfLoading(false)
@@ -167,7 +171,20 @@ function Analytics() {
   }
 
   // Préparer les données pour les charts
-  const chartMonthData = analyticsData?.by_month || []
+  const getChartData = () => {
+    if (chartViewMode === 'month') {
+      // Par an (utilise by_month)
+      return analyticsData?.by_month || []
+    } else {
+      // Par mois (utilise by_date du mois courant par défaut)
+      return analyticsData?.by_date || []
+    }
+  }
+
+  const chartDisplayData = getChartData()
+  const chartLabel = chartViewMode === 'month' ? 'Mois' : 'Jour'
+  const dateField = chartViewMode === 'month' ? 'month' : 'date'
+
   const totalPages = Math.ceil(tableData.length / itemsPerPage)
   const startIdx = (currentPage - 1) * itemsPerPage
   const paginatedData = tableData.slice(startIdx, startIdx + itemsPerPage)
@@ -386,9 +403,43 @@ function Analytics() {
         </div>
       ) : analyticsData ? (
         <>
+          {/* Boutons de sélection du mode chart */}
+          <div style={{ marginBottom: '2rem', display: 'flex', gap: '1rem' }}>
+            <button
+              onClick={() => setChartViewMode('month')}
+              style={{
+                padding: '0.625rem 1.25rem',
+                backgroundColor: chartViewMode === 'month' ? '#2563eb' : '#e5e7eb',
+                color: chartViewMode === 'month' ? 'white' : '#374151',
+                border: 'none',
+                borderRadius: '0.375rem',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                fontSize: '0.875rem'
+              }}
+            >
+              Par an
+            </button>
+            <button
+              onClick={() => setChartViewMode('date')}
+              style={{
+                padding: '0.625rem 1.25rem',
+                backgroundColor: chartViewMode === 'date' ? '#2563eb' : '#e5e7eb',
+                color: chartViewMode === 'date' ? 'white' : '#374151',
+                border: 'none',
+                borderRadius: '0.375rem',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                fontSize: '0.875rem'
+              }}
+            >
+              Par mois
+            </button>
+          </div>
+
           {/* Deux charts côte à côte */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '2rem', marginBottom: '2rem' }}>
-            {/* Histogramme - Nombre de rapports par mois */}
+            {/* Histogramme - Nombre de rapports */}
             <div style={{
               backgroundColor: 'white',
               padding: '1.5rem',
@@ -397,15 +448,15 @@ function Analytics() {
               boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
             }}>
               <h3 style={{ marginBottom: '1rem', fontSize: '1rem', fontWeight: 'bold', color: '#374151' }}>
-                Nombre de rapports par mois
+                Nombre de rapports par {chartLabel}
               </h3>
-              {chartMonthData.length > 0 ? (
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.5rem', height: '200px' }}>
-                  {chartMonthData.map((item, idx) => {
-                    const maxCount = Math.max(...chartMonthData.map(d => d.count))
+              {chartDisplayData.length > 0 ? (
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.5rem', height: '200px', overflowX: 'auto', paddingBottom: '0.5rem' }}>
+                  {chartDisplayData.map((item, idx) => {
+                    const maxCount = Math.max(...chartDisplayData.map(d => d.count))
                     const height = (item.count / maxCount) * 100
                     return (
-                      <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                      <div key={idx} style={{ flex: '0 0 auto', minWidth: '60px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                         <div style={{
                           width: '100%',
                           height: `${height}%`,
@@ -420,8 +471,8 @@ function Analytics() {
                         }}>
                           {item.count > 0 && <span>{item.count}</span>}
                         </div>
-                        <div style={{ fontSize: '0.75rem', marginTop: '0.5rem', textAlign: 'center', color: '#666' }}>
-                          {item.month}
+                        <div style={{ fontSize: '0.7rem', marginTop: '0.5rem', textAlign: 'center', color: '#666', wordBreak: 'break-word', width: '100%' }}>
+                          {item[dateField]}
                         </div>
                       </div>
                     )
@@ -443,20 +494,26 @@ function Analytics() {
               boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
             }}>
               <h3 style={{ marginBottom: '1rem', fontSize: '1rem', fontWeight: 'bold', color: '#374151' }}>
-                Évolution des prix moyens
+                Évolution des prix moyens par {chartLabel}
               </h3>
-              {chartMonthData.length > 0 ? (
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2rem', overflowX: 'auto', paddingBottom: '1rem' }}>
-                  {chartMonthData.map((item, idx) => (
-                    <div key={idx} style={{ minWidth: '120px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <div style={{ fontSize: '0.75rem', color: '#2563eb', fontWeight: 'bold', marginBottom: '0.25rem' }}>
-                        Unit: {parseFloat(item.avg_prix_unitaire).toLocaleString()} Ar
+              {chartDisplayData.length > 0 ? (
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1.5rem', overflowX: 'auto', paddingBottom: '1rem' }}>
+                  {chartDisplayData.map((item, idx) => (
+                    <div key={idx} style={{ flex: '0 0 auto', minWidth: '140px', display: 'flex', flexDirection: 'column', alignItems: 'center', backgroundColor: '#f9fafb', padding: '0.75rem', borderRadius: '0.375rem', border: '1px solid #e5e7eb' }}>
+                      <div style={{ fontSize: '0.7rem', color: '#2563eb', fontWeight: 'bold', marginBottom: '0.5rem', textAlign: 'center' }}>
+                        Prix Unit.
                       </div>
-                      <div style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 'bold', marginBottom: '0.5rem' }}>
-                        Gros: {parseFloat(item.avg_prix_gros).toLocaleString()} Ar
+                      <div style={{ fontSize: '1rem', color: '#2563eb', fontWeight: 'bold', marginBottom: '0.75rem', textAlign: 'center' }}>
+                        {parseFloat(item.avg_prix_unitaire || 0).toLocaleString()} Ar
                       </div>
-                      <div style={{ fontSize: '0.75rem', color: '#666' }}>
-                        {item.month}
+                      <div style={{ fontSize: '0.7rem', color: '#10b981', fontWeight: 'bold', marginBottom: '0.5rem', textAlign: 'center' }}>
+                        Prix Gros
+                      </div>
+                      <div style={{ fontSize: '1rem', color: '#10b981', fontWeight: 'bold', marginBottom: '0.75rem', textAlign: 'center' }}>
+                        {parseFloat(item.avg_prix_gros || 0).toLocaleString()} Ar
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#666', fontWeight: 'bold', textAlign: 'center', borderTop: '1px solid #e5e7eb', paddingTop: '0.5rem', width: '100%' }}>
+                        {item[dateField]}
                       </div>
                     </div>
                   ))}
