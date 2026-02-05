@@ -123,6 +123,17 @@ function DashboardLayout({ children }) {
 function AppContent() {
   const { isAuthenticated, user } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const onBack = () => { window.history.back(); }
+  const onRegistered = (email) => { 
+    console.log("User registered:", email);
+    localStorage.setItem('registeredEmail', email);
+    window.location.href = '/otp-verify';
+   }
+
+   const onVerify = (otpCode) => {
+    console.log("OTP verified:", otpCode);
+   }
+  
 
   const DashboardHome = () => {
     if (!isAuthenticated) return null;
@@ -146,7 +157,7 @@ function AppContent() {
         path="/register"
         element={
           <AuthPage>
-            <Register />
+            <Register onBack={onBack} onRegistered={onRegistered} />
           </AuthPage>
         }
       />
@@ -154,7 +165,7 @@ function AppContent() {
         path="/otp-verify"
         element={
           <AuthPage>
-            <EmailOTP />
+            <EmailOTP onBack={onBack} email={localStorage.getItem('registeredEmail')} onVerify={onVerify} />
           </AuthPage>
         }
       />

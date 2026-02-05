@@ -137,7 +137,7 @@ function AdminDashboard({ onNavigate }) {
                 <tbody>
                   {recentReports.map(report => (
                     <tr key={report.idrapport || report.id_rapport}>
-                      <td style={{ fontWeight: 500 }}>{report.ppn?.nomppn || 'N/A'}</td>
+                      <td style={{ fontWeight: 500 }}>{report.ppn?.nom_ppn || 'N/A'}</td>
                       <td>
                         {(report.prix_unitaire_min || report.prix_unitaire_min) ? 
                           `${(report.prix_unitaire_min || report.prix_unitaire_min).toLocaleString()} - ${(report.prix_unitaire_max || report.prix_unitaire_max).toLocaleString()} Ar` 

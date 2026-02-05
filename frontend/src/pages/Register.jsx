@@ -125,7 +125,6 @@ function Register({ onBack, onRegistered }) {
 
       showNotification('success', 'Compte créé. Vérifiez votre email pour activer votre compte.')
 
-      // Si tu veux aller sur OTP (recommandé), utilise onRegistered (voir snippet App.jsx plus bas)
       if (typeof onRegistered === 'function') {
         onRegistered(formData.email)
         return

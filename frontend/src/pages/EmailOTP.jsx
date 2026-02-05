@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import '../styles/login.css'
+import api from '../utils/api'; 
 
 function EmailOTP({ email, onVerify, onBack }) {
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
@@ -30,6 +31,20 @@ function EmailOTP({ email, onVerify, onBack }) {
     if (value && index < 5) {
       const nextInput = document.getElementById(`otp-${index + 1}`)
       if (nextInput) nextInput.focus()
+    }
+  }
+
+  const handleVerifyOtp = async () => {
+    const otpCode = otp.join('')
+    try {
+      const response = await api.post('/verify-otp', { otp: otpCode, email })
+      if (response.data.success) {
+        onVerify(otpCode)
+      } else {
+        setError('Code OTP invalide')
+      }
+    } catch (err) {
+      setError('Erreur lors de la verification du code OTP')
     }
   }
 
@@ -105,7 +120,7 @@ function EmailOTP({ email, onVerify, onBack }) {
             ))}
           </div>
 
-          <button type="submit" className="login-submit" disabled={isLoading}>
+          <button type="submit" className="login-submit" disabled={isLoading} onClick={handleVerifyOtp} >
             {isLoading ? (
               <>
                 <span className="spinner"></span>
