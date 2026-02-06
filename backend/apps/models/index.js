@@ -1,11 +1,17 @@
-const dbConfig = require("../../config/db_config.js").development;
+const dbConfig = require("../../config/db_config.js");
 const { Sequelize, DataTypes } = require("sequelize");
 
-const sequelize = new Sequelize({
-  dialect: 'sqlite',
-  storage: dbConfig.storage,
-  logging: dbConfig.logging
-});
+const sequelize = new Sequelize(
+  dbConfig.database,
+  dbConfig.username,
+  dbConfig.password,
+  {
+    host: dbConfig.host,
+    port: dbConfig.port,
+    dialect: dbConfig.dialect,
+    logging: dbConfig.logging
+  }
+);
 
 sequelize
   .authenticate()
@@ -18,14 +24,14 @@ sequelize
 
 const db = {};
 
-db.Sequelize = sequelize;
+db.Sequelize = Sequelize;
 db.sequelize = sequelize;
 
 db.Employe = require("./employe.js")(sequelize, DataTypes);
 db.Ppn = require("./ppn")(sequelize, DataTypes);
 db.Rapport = require("./rapport")(sequelize, DataTypes);
-db.Moderateur = require('./moderateur')(sequelize, Sequelize.DataTypes);
-db.OtpCode     = require('./otpCode')(sequelize, Sequelize.DataTypes);
+db.Moderateur = require("./moderateur")(sequelize, DataTypes);
+db.OtpCode = require("./otpCode")(sequelize, DataTypes);
 
 Object.values(db).forEach(model => {
   if (model.associate) {
