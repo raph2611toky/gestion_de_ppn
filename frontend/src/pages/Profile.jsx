@@ -74,10 +74,10 @@ function Profile({ onNavigate }) {
         <div className="profile-header">
           <div className="profile-photo-section">
             <div className="profile-photo">
-              {previewPhoto ? (
-                <img src={previewPhoto} alt="Profile" />
+              {user?.photo ? (
+                <img src={user?.photo} alt="Profile" />
               ) : (
-                <div className="profile-photo-placeholder">{user?.name?.charAt(0).toUpperCase()}</div>
+                <div className="profile-photo-placeholder">{user?.nom?.charAt(0).toUpperCase()}</div>
               )}
             </div>
             <label className="profile-photo-upload">
@@ -98,8 +98,8 @@ function Profile({ onNavigate }) {
 
           <div className="profile-info">
             <h1 className="profile-name">{user?.name}</h1>
-            <p className="profile-role">{user?.role === 'admin' ? 'Administrateur' : 'Utilisateur Regional'}</p>
-            <p className="profile-region">{user?.region || 'Non specifie'}</p>
+            <p className="profile-role">{user?.fonction === 'ADMINISTRATEUR' ? 'Administrateur' : 'Utilisateur Regional'}</p>
+            {user?.fonction === "MODERATEUR" && <p className="profile-region">{user?.region || 'Non specifie'}</p>}
           </div>
         </div>
 
