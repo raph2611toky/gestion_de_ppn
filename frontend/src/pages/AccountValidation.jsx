@@ -69,6 +69,7 @@ function AccountValidation() {
       showNotification('success', message)
       setConfirmAction(null)
       setSelectedModerator(null)
+      setShowConfirm(false);
       await fetchModerators()
     } catch (err) {
       console.log('[+] Erreur lors de l\'action:', err.message)
@@ -367,6 +368,7 @@ function AccountValidation() {
       <ConfirmDialog
         isOpen={showConfirm}
         onClose={() => { setShowConfirm(false); setConfirmAction(null) }}
+        onCancel={() => { setShowConfirm(false); setConfirmAction(null) }}
         onConfirm={confirmStatusChange}
         title={confirmAction?.action === 'validate' ? 'Valider le modérateur' : 'Rejeter le modérateur'}
         message={

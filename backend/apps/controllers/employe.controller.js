@@ -352,7 +352,7 @@ const getPendingModeratorDetails = async (req, res) => {
                 include: [{ model: Moderateur, as: 'moderateurDetails' }],
             });
 
-        if (!moderator || !moderator?.moderateurDetails?.is_validated || !moderator?.moderateurDetails?.is_verified) {
+        if (!moderator || moderator?.moderateurDetails?.is_validated) {
             return Helper.send_res(res, { erreur: "Modérateur non trouvé ou déjà validé" }, 404);
         }
 
@@ -412,12 +412,12 @@ const rejectModerator = async (req, res) => {
         const id = req.params.id;
 
         const employe = await Employe.findByPk(id);
-        if (!employe || employe.fonction !== 'MODERATEUR' || employe.is_active) {
+        if (!employe || employe.fonction !== 'MODERATEUR') {
             return Helper.send_res(res, { erreur: "Modérateur non trouvé ou déjà actif" }, 404);
         }
 
         const moderateur = await Moderateur.findOne({ where: { employe_id: id } });
-        if (!moderateur || !moderateur.is_verified) {
+        if (!moderateur) {
             return Helper.send_res(res, { erreur: "Modérateur non vérifié ou non trouvé" }, 400);
         }
 
@@ -428,6 +428,9 @@ const rejectModerator = async (req, res) => {
         if (!emailSent) {
             console.warn("Échec envoi email validation");
         }
+
+        await moderateur.destroy();
+        await employe.destroy();
 
         return Helper.send_res(res, { message: "Modérateur rejeté avec succès" }, 200);
 
