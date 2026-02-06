@@ -119,9 +119,10 @@ function Register({ onBack, onRegistered }) {
 
 
       // ton api.js a déjà baseURL + json headers; ici on force multipart sur cette requête [file:25]
-      await api.post('/register', payload, {
+      const response = await api.post('/register', payload, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
+      console.log("reponse: ", response)
 
       showNotification('success', 'Compte créé. Vérifiez votre email pour activer votre compte.')
 

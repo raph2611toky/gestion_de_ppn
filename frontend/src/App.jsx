@@ -128,10 +128,7 @@ function AppContent() {
     console.log("User registered:", email);
     localStorage.setItem('registeredEmail', email);
     window.location.href = '/otp-verify';
-   }
-
-   const onVerify = (otpCode) => {
-    console.log("OTP verified:", otpCode);
+    return;
    }
   
 
@@ -149,7 +146,9 @@ function AppContent() {
         path="/login"
         element={
           <AuthPage>
-            <Login onThemeToggle={toggleTheme} theme={theme} />
+            <NotificationProvider>
+              <Login onThemeToggle={toggleTheme} theme={theme} />
+            </NotificationProvider>
           </AuthPage>
         }
       />
@@ -157,7 +156,9 @@ function AppContent() {
         path="/register"
         element={
           <AuthPage>
-            <Register onBack={onBack} onRegistered={onRegistered} />
+            <NotificationProvider>
+              <Register onBack={onBack} onRegistered={onRegistered} />
+            </NotificationProvider>
           </AuthPage>
         }
       />
@@ -165,7 +166,7 @@ function AppContent() {
         path="/otp-verify"
         element={
           <AuthPage>
-            <EmailOTP onBack={onBack} email={localStorage.getItem('registeredEmail')} onVerify={onVerify} />
+            <EmailOTP onBack={onBack} email={localStorage.getItem('registeredEmail')} />
           </AuthPage>
         }
       />

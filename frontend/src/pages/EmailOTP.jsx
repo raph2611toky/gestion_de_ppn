@@ -1,16 +1,18 @@
 'use client';
 
 import React, { useState, useEffect } from 'react'
+import AccountVerificationSuccess from './AccountVerificationSuccess'
+import api from '../utils/api'
 import '../styles/login.css'
-import api from '../utils/api'; 
 
-function EmailOTP({ email, onVerify, onBack }) {
+function EmailOTP({ email, onBack }) {
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [resendLoading, setResendLoading] = useState(false)
   const [canResend, setCanResend] = useState(false)
   const [countdown, setCountdown] = useState(0)
+  const [isVerified, setIsVerified] = useState(false)
 
   useEffect(() => {
     let timer
@@ -34,20 +36,6 @@ function EmailOTP({ email, onVerify, onBack }) {
     }
   }
 
-  const handleVerifyOtp = async () => {
-    const otpCode = otp.join('')
-    try {
-      const response = await api.post('/verify-otp', { otp: otpCode, email })
-      if (response.data.success) {
-        onVerify(otpCode)
-      } else {
-        setError('Code OTP invalide')
-      }
-    } catch (err) {
-      setError('Erreur lors de la verification du code OTP')
-    }
-  }
-
   const handleKeyDown = (index, e) => {
     if (e.key === 'Backspace' && !otp[index] && index > 0) {
       const prevInput = document.getElementById(`otp-${index - 1}`)
@@ -66,9 +54,24 @@ function EmailOTP({ email, onVerify, onBack }) {
     }
 
     setIsLoading(true)
-    setTimeout(() => {
-      onVerify(otpCode)
-      setIsLoading(false)
+    console.log('[v0] OTP verification started with code:', otpCode)
+    
+    setTimeout(async () => {
+      try {
+        const response = await api.post("/verify-otp", { email, code_otp: otpCode })
+        console.log('[v0] API response:', response)
+        if (response?.status === 200) {
+          setIsVerified(true)
+          console.log('[v0] Verification successful')
+        } else {
+          setError('Code OTP invalide. Veuillez réessayer.')
+        }
+      } catch (err) {
+        console.log('[v0] Verification error:', err.message)
+        setError('Une erreur est survenue lors de la vérification')
+      } finally {
+        setIsLoading(false)
+      }
     }, 500)
   }
 
@@ -81,6 +84,10 @@ function EmailOTP({ email, onVerify, onBack }) {
       setOtp(['', '', '', '', '', ''])
       setResendLoading(false)
     }, 500)
+  }
+
+  if (isVerified) {
+    return <AccountVerificationSuccess email={email} />
   }
 
   return (
@@ -120,7 +127,7 @@ function EmailOTP({ email, onVerify, onBack }) {
             ))}
           </div>
 
-          <button type="submit" className="login-submit" disabled={isLoading} onClick={handleVerifyOtp} >
+          <button type="submit" className="login-submit" disabled={isLoading}>
             {isLoading ? (
               <>
                 <span className="spinner"></span>
